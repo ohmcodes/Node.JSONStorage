@@ -121,6 +121,9 @@ export async function useSavedBin(entry) {
   storeEditorDraft(true);
   state.currentSavedBinId = entry.id;
   showSavedBinId(entry.id);
+  ui.apiMethod.value = 'GET';
+  ui.apiUrl.value = `/api/bins/${entry.id}`;
+  $('api-panel').open = true;
   document.querySelector(`input[name="visibility"][value="${entry.visibility}"]`).checked = true;
   $('storage-panel').open = true;
   ui.editor.scrollIntoView({ behavior: 'smooth', block: 'center' });

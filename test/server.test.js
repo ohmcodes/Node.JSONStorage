@@ -101,6 +101,85 @@ test('public app config returns only donation URL settings', async t => {
   assert.ok(Object.values(response.body.donations).every(value => typeof value === 'string'));
 });
 
+test('nested lookups filter arrays and select matching values', async t => {
+  const { request, key } = await setup(t);
+  const blueprint = "Blueprint'/Game/PrimalEarth/Dinos/Dodo/Dodo_Character_BP.Dodo_Character_BP'";
+  const value = {
+    Dinos: [{
+      Blueprint: blueprint,
+      Award: [
+        { MinLevel: 1, MaxLevel: 20, Points: 1 },
+        { MinLevel: 21, MaxLevel: 50, Points: 5 },
+        { MinLevel: 51, MaxLevel: 150, Points: 20 }
+      ]
+    }]
+  };
+  const publicBin = await request('/api/bins?visibility=public', options('POST', key, value));
+  const publicQuery = {
+    steps: [
+      { array: 'Dinos', where: { Blueprint: blueprint } },
+      {
+        array: 'Award',
+        level: 75,
+        select: 'Points'
+      }
+    ]
+  };
+  const result = await request(`/api/bins/${publicBin.body.id}/query`, options('POST', null, publicQuery));
+  assert.deepEqual(result.body, { Points: 20 });
+
+  const partialBlueprintQuery = {
+    ...publicQuery,
+    steps: [
+      { array: 'Dinos', where: { Blueprint: { contains: 'Dodo' } } },
+      publicQuery.steps[1]
+    ]
+  };
+  const partialResult = await request(`/api/bins/${publicBin.body.id}/query`, options('POST', null, partialBlueprintQuery));
+  assert.deepEqual(partialResult.body, { Points: 20 });
+  const level25Result = await request(`/api/bins/${publicBin.body.id}/query`, options('POST', null, {
+    steps: [
+      { array: 'Dinos', where: { Blueprint: { contains: 'Dodo' } } },
+      { array: 'Award', level: 25, select: 'Points' }
+    ]
+  }));
+  assert.deepEqual(level25Result.body, { Points: 5 });
+  const multipleBin = await request('/api/bins?visibility=public', options('POST', key, {
+    Dinos: [value.Dinos[0], value.Dinos[0]]
+  }));
+  const multipleResult = await request(`/api/bins/${multipleBin.body.id}/query`, options('POST', null, {
+    steps: [
+      { array: 'Dinos', where: { Blueprint: { contains: 'Dodo' } } },
+      { array: 'Award', level: 25, select: 'Points' }
+    ]
+  }));
+  assert.deepEqual(multipleResult.body, [{ Points: 5 }, { Points: 5 }]);
+  const shortExactMatch = await request(`/api/bins/${publicBin.body.id}/query`, options('POST', null, {
+    steps: [
+      { array: 'Dinos', where: { Blueprint: 'Dodo' } },
+      publicQuery.steps[1]
+    ]
+  }));
+  assert.deepEqual(shortExactMatch.body, []);
+
+  const noMatch = await request(`/api/bins/${publicBin.body.id}/query`, options('POST', null, {
+    steps: [
+      { array: 'Dinos', where: { Blueprint: 'not-this-dino' } },
+      { array: 'Award', select: 'Points' }
+    ]
+  }));
+  assert.deepEqual(noMatch.body, []);
+  assert.equal((await request(`/api/bins/${publicBin.body.id}/query`, options('POST', null, {
+    steps: [{ array: 'Dinos', where: { Blueprint: { contains: 'Dodo' } } }, { array: 'Award', level: '25', select: 'Points' }]
+  }))).status, 400);
+
+  const privateBin = await request('/api/bins?visibility=private', options('POST', key, value));
+  const privateUrl = `/api/bins/${privateBin.body.id}/query`;
+  assert.equal((await request(privateUrl, options('POST', null, publicQuery))).status, 401);
+  assert.deepEqual((await request(privateUrl, options('POST', key, publicQuery))).body, { Points: 20 });
+  assert.equal((await request(privateUrl, options('POST', key, { steps: [{ array: '__proto__' }] }))).status, 400);
+});
+
 test('serves browser ES modules as JavaScript', async t => {
   const { base } = await setup(t);
   const modules = ['app.js', 'core.js', 'api.js', 'bins.js', 'bin-sync.js', 'live-logs.js', 'actions.js', 'events.js', 'donations.js', 'theme.js', 'draft.js'];

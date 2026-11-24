@@ -102,13 +102,17 @@
       <div class="request-row">
         <label for="api-method">Method</label>
         <select id="api-method">
-          <option>GET</option><option>PUT</option><option>PATCH</option>
+          <option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option>
         </select>
         <label for="api-url">Endpoint or bin ID</label>
         <input id="api-url" type="text" value="/api/bins" placeholder="Paste a bin ID or /api/... endpoint" autocomplete="off" spellcheck="false">
         <button id="send-request" type="button">Send</button>
       </div>
-      <p class="request-hint">GET reads a bin; PUT replaces it; PATCH merges top-level object fields. PUT and PATCH use the editor contents as the JSON request body. Save bin creates bins and the saved-bin list handles deletion.</p>
+      <div id="api-body-field" class="api-body-field" hidden>
+        <label for="api-body">Request body</label>
+        <textarea id="api-body" rows="8" spellcheck="false" placeholder='{"steps": []}'></textarea>
+      </div>
+      <p class="request-hint">GET reads a bin; POST can run a nested-array lookup; PUT replaces it; PATCH merges top-level object fields. POST, PUT, and PATCH use this request body.</p>
       <details class="request-options">
         <summary>Headers</summary>
         <div class="field api-key-field">
@@ -157,17 +161,38 @@
         <li>Live API Logs are public-safe and run for up to 10 minutes. Stop resets the timer for the next start; sessions also stop after 5 minutes idle. Clear empties this viewer, and new events auto-scroll to the latest.</li>
       </ol>
       <h3>API endpoints</h3>
-      <p>These paths are relative to this site; the host is added automatically. Use GET to read, PUT to replace, or PATCH to merge a saved bin. Save bin creates bins and the saved-bin list handles deletion.</p>
+      <p>These paths are relative to this site; the host is added automatically. Use GET to read, POST to query nested arrays, PUT to replace, or PATCH to merge a saved bin.</p>
       <div class="endpoint-table-wrap">
         <table class="endpoint-table">
           <thead><tr><th>Method</th><th>Endpoint</th><th>Purpose</th><th></th></tr></thead>
           <tbody>
             <tr><td>GET</td><td><code>/api/bins/YOUR_BIN_ID</code></td><td>Read a bin</td><td><a class="endpoint-use" href="#api-panel" data-method="GET" data-endpoint="/api/bins/YOUR_BIN_ID">Use endpoint</a></td></tr>
+            <tr><td>POST</td><td><code>/api/bins/YOUR_BIN_ID/query</code></td><td>Filter nested arrays and select matching values</td><td><a class="endpoint-use" href="#api-panel" data-method="POST" data-endpoint="/api/bins/YOUR_BIN_ID/query">Use endpoint</a></td></tr>
             <tr><td>PUT</td><td><code>/api/bins/YOUR_BIN_ID</code></td><td>Replace a bin</td><td><a class="endpoint-use" href="#api-panel" data-method="PUT" data-endpoint="/api/bins/YOUR_BIN_ID">Use endpoint</a></td></tr>
             <tr><td>PATCH</td><td><code>/api/bins/YOUR_BIN_ID</code></td><td>Merge top-level object fields</td><td><a class="endpoint-use" href="#api-panel" data-method="PATCH" data-endpoint="/api/bins/YOUR_BIN_ID">Use endpoint</a></td></tr>
           </tbody>
         </table>
       </div>
+      <details class="request-options">
+        <summary>Nested lookup example</summary>
+        <p>Choose POST, set the endpoint to <code>/api/bins/YOUR_BIN_ID/query</code>, and put this JSON in the API tester's Request body. One match returns an object such as <code>{ "Points": 5 }</code>; multiple matches return an array of objects. A plain Blueprint string must match exactly; use <code>{ "contains": "Dodo" }</code> for a case-sensitive partial match. Use the full Blueprint text when matching names could be ambiguous. The <code>level</code> field automatically finds the Award whose MinLevel/MaxLevel range contains that level.</p>
+        <pre><code>{
+  "steps": [
+    {
+      "array": "DinoRewards.Dinos",
+      "where": { "Blueprint": { "contains": "Dodo" } }
+      "where": {
+        "Blueprint": "Blueprint'/Game/PrimalEarth/Dinos/Dodo/Dodo_Character_BP.Dodo_Character_BP'"
+      }
+    },
+    {
+      "array": "Award",
+      "level": 25,
+      "select": "Points"
+    }
+  ]
+}</code></pre>
+      </details>
       <details class="request-options">
         <summary>Private GET, PUT, and PATCH header examples</summary>
         <p>Replace <code>YOUR_KEY</code> and <code>YOUR_BIN_ID</code>. Public GET requests can omit the key header.</p>

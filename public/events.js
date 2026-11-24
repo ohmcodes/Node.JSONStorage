@@ -1,6 +1,6 @@
 import { $, hasUnsavedEditorContent, message, state, storeEditorDraft, ui } from './core.js';
 import * as actions from './actions.js';
-import { deleteSavedBin, getSavedBin, reconcileSavedBins, renderSavedBins, useSavedBin } from './bins.js';
+import { deleteSavedBin, getSavedBin, getSavedBins, reconcileSavedBins, renderSavedBins, useSavedBin } from './bins.js';
 import { clearLiveLogs, connectLiveLogs, renderLiveLogs, stopLiveLogs } from './live-logs.js';
 import { configureDonationLinks } from './donations.js';
 import { initializeTheme } from './theme.js';
@@ -33,7 +33,9 @@ function bindEndpointLinks() {
     link.addEventListener('click', event => {
       event.preventDefault();
       ui.apiMethod.value = link.dataset.method;
-      ui.apiUrl.value = link.dataset.endpoint;
+      const binId = selectedApiBinId();
+      ui.apiUrl.value = link.dataset.endpoint.replace(/YOUR_BIN_ID/g, binId || 'YOUR_BIN_ID');
+      updateApiBodyVisibility();
       const endpoint = new URL(link.dataset.endpoint, window.location.origin);
       if (link.dataset.method === 'POST' && endpoint.pathname === '/api/bins') {
         state.currentSavedBinId = '';
@@ -45,6 +47,32 @@ function bindEndpointLinks() {
       ui.apiUrl.focus();
     });
   });
+}
+
+function updateApiBodyVisibility() {
+  $('api-body-field').hidden = !['POST', 'PUT', 'PATCH'].includes(ui.apiMethod.value);
+}
+
+function selectedApiBinId() {
+  return state.currentSavedBinId || $('saved-bin-id').value.trim() || getSavedBins()[0]?.id || '';
+}
+
+function populateApiUrlForMethod() {
+  const binId = selectedApiBinId();
+  if (!binId) return;
+  const endpoint = ui.apiUrl.value.trim();
+  const binEndpoint = `/api/bins/${binId}`;
+  const isSelectedBinEndpoint = endpoint === binEndpoint || endpoint === `${binEndpoint}/query`;
+  if (!endpoint.includes('YOUR_BIN_ID') && !/^\/api\/bins(?:\?.*)?$/.test(endpoint) && !isSelectedBinEndpoint) return;
+  ui.apiUrl.value = ui.apiMethod.value === 'POST' ? `${binEndpoint}/query` : binEndpoint;
+}
+
+function bindApiTesterEvents() {
+  ui.apiMethod.addEventListener('change', () => {
+    updateApiBodyVisibility();
+    populateApiUrlForMethod();
+  });
+  updateApiBodyVisibility();
 }
 
 function bindSavedBinEvents() {
@@ -124,6 +152,7 @@ export function initializeApp() {
   bindActions();
   bindSavedBinEvents();
   bindLogEvents();
+  bindApiTesterEvents();
   bindVisibilityEvents();
   bindEndpointLinks();
   $('copyright-year').textContent = String(new Date().getFullYear());

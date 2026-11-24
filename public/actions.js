@@ -80,7 +80,7 @@ export async function sendTestRequest() {
   const target = apiTarget();
   if (method === 'DELETE' && !confirm('Delete this bin? The owner key or its creating browser cookie is required.')) return;
   const value = await sendApiRequest(method, target.pathname + target.search,
-    ['POST', 'PUT', 'PATCH'].includes(method) ? ui.editor.value : undefined,
+    ['POST', 'PUT', 'PATCH'].includes(method) ? $('api-body').value : undefined,
     ui.apiKeyHeader.value.trim() || ui.key.value.trim());
   if (method === 'POST' && target.pathname === '/api/bins' && value.id) {
     state.currentSavedBinId = value.id;
@@ -100,9 +100,6 @@ export async function sendTestRequest() {
   }
   if (method === 'POST' && target.pathname === '/api/accounts' && value.secretKey) {
     showGeneratedKey(value.secretKey);
-  }
-  if (['POST', 'PUT', 'PATCH'].includes(method) && target.pathname.startsWith('/api/bins')) {
-    storeEditorDraft(true);
   }
   message('Request completed', 'success', 'api');
 }

@@ -139,7 +139,7 @@ function createServer({
   function recordActivity(req, status, value) {
     const pathname = new URL(req.url, 'http://localhost').pathname;
     if (!pathname.startsWith('/api/') || pathname === '/api/live-logs') return;
-    const binMatch = /^\/api\/bins\/([a-f0-9]{32})$/.exec(pathname);
+    const binMatch = /^\/api\/bins\/([a-f0-9]{32})(?:\/query)?$/.exec(pathname);
     const responseBinId = value && typeof value.id === 'string' && /^[a-f0-9]{32}$/.test(value.id)
       ? value.id
       : null;
@@ -176,6 +176,114 @@ function createServer({
 
   function parse(text) {
     try { return JSON.parse(text); } catch { fail(400, 'Invalid JSON'); }
+  }
+
+  function lookupPath(value, pathValue) {
+    if (typeof pathValue !== 'string' || !pathValue.trim()) fail(400, 'Lookup paths must be non-empty strings');
+    const segments = pathValue.split('.');
+    if (segments.some(segment => !segment || ['__proto__', 'prototype', 'constructor'].includes(segment))) {
+      fail(400, 'Lookup path contains an invalid property');
+    }
+    let current = value;
+    for (const segment of segments) {
+      if (current === null || typeof current !== 'object' || !Object.hasOwn(current, segment)) {
+        return { found: false, value: undefined };
+      }
+      current = current[segment];
+    }
+    return { found: true, value: current };
+  }
+
+  function validateLookupWhere(where) {
+    if (where === undefined) return;
+    if (!where || typeof where !== 'object' || Array.isArray(where)) fail(400, 'Lookup where must be an object');
+    const operators = new Set(['eq', 'ne', 'lt', 'lte', 'gt', 'gte', 'in', 'contains']);
+    for (const [pathValue, condition] of Object.entries(where)) {
+      lookupPath({}, pathValue);
+      if (condition && typeof condition === 'object' && !Array.isArray(condition)) {
+        const names = Object.keys(condition);
+        if (!names.length || names.some(name => !operators.has(name))) {
+          fail(400, 'Lookup conditions support eq, ne, lt, lte, gt, gte, in, and contains');
+        }
+        if (Object.hasOwn(condition, 'in') && !Array.isArray(condition.in)) {
+          fail(400, 'The in lookup condition requires an array');
+        }
+        if (Object.hasOwn(condition, 'contains') && typeof condition.contains !== 'string') {
+          fail(400, 'The contains lookup condition requires a string');
+        }
+      }
+    }
+  }
+
+  function lookupMatches(value, where = {}) {
+    return Object.entries(where).every(([pathValue, condition]) => {
+      const actual = lookupPath(value, pathValue);
+      if (!actual.found) return false;
+      if (!condition || typeof condition !== 'object' || Array.isArray(condition)) {
+        return Object.is(actual.value, condition);
+      }
+      return Object.entries(condition).every(([operator, expected]) => {
+        if (operator === 'eq') return Object.is(actual.value, expected);
+        if (operator === 'ne') return !Object.is(actual.value, expected);
+        if (operator === 'in') return expected.some(item => Object.is(actual.value, item));
+        if (operator === 'contains') return typeof actual.value === 'string' && actual.value.includes(expected);
+        if (typeof actual.value !== 'number' || typeof expected !== 'number') return false;
+        if (operator === 'lt') return actual.value < expected;
+        if (operator === 'lte') return actual.value <= expected;
+        if (operator === 'gt') return actual.value > expected;
+        if (operator === 'gte') return actual.value >= expected;
+        return false;
+      });
+    });
+  }
+
+  function lookupBin(value, query) {
+    if (!query || typeof query !== 'object' || Array.isArray(query) ||
+        Object.keys(query).some(key => key !== 'steps') ||
+        !Array.isArray(query.steps) || query.steps.length < 1 || query.steps.length > 12) {
+      fail(400, 'Lookup body must contain 1 to 12 steps');
+    }
+    let results = [value];
+    for (const step of query.steps) {
+      if (!step || typeof step !== 'object' || Array.isArray(step) ||
+          Object.keys(step).some(key => !['array', 'where', 'select', 'level'].includes(key))) {
+        fail(400, 'Each lookup step supports array, where, select, and level');
+      }
+      lookupPath({}, step.array);
+      validateLookupWhere(step.where);
+      if (step.select !== undefined) lookupPath({}, step.select);
+      if (step.level !== undefined && (typeof step.level !== 'number' || !Number.isFinite(step.level))) {
+        fail(400, 'Lookup level must be a finite number');
+      }
+      const next = [];
+      for (const parent of results) {
+        const collection = lookupPath(parent, step.array);
+        if (!collection.found) continue;
+        if (!Array.isArray(collection.value)) fail(400, `Lookup path ${step.array} must point to an array`);
+        for (const item of collection.value) {
+          if (!lookupMatches(item, step.where)) continue;
+          if (step.level !== undefined) {
+            const minLevel = lookupPath(item, 'MinLevel');
+            const maxLevel = lookupPath(item, 'MaxLevel');
+            if (!minLevel.found || !maxLevel.found ||
+                typeof minLevel.value !== 'number' || typeof maxLevel.value !== 'number' ||
+                step.level < minLevel.value || step.level > maxLevel.value) continue;
+          }
+          if (step.select === undefined) {
+            next.push(item);
+          } else {
+            const selected = lookupPath(item, step.select);
+            if (!selected.found) fail(400, `Selected path ${step.select} was not found`);
+            const selectedKey = step.select.split('.').at(-1);
+            next.push({ [selectedKey]: selected.value });
+          }
+          if (next.length > 1000) fail(413, 'Lookup result exceeds 1000 items');
+        }
+      }
+      results = next;
+    }
+    const finalStep = query.steps[query.steps.length - 1];
+    return finalStep.select !== undefined && results.length === 1 ? results[0] : results;
   }
 
   function size(value) {
@@ -332,6 +440,24 @@ function createServer({
           res.setHeader('Set-Cookie', `bin_owner=${newOwnerCookie}; Path=/; HttpOnly; SameSite=Strict; Max-Age=31536000`);
         }
         return send(req, res, 201, { id, visibility });
+      }
+
+      const lookupMatch = /^\/api\/bins\/([a-f0-9]{32})\/query$/.exec(url.pathname);
+      if (lookupMatch) {
+        if (req.method !== 'POST') fail(405, 'Method not allowed');
+        const bin = readBin(lookupMatch[1]);
+        if (!bin) fail(404, 'Not found');
+        req.binVisibility = bin.visibility;
+        if (bin.visibility === 'private' && accountFor(req) !== bin.owner) {
+          fail(401, 'Valid secret key required');
+        }
+        const result = lookupBin(bin.value, parse(await body(req)));
+        const account = accounts[bin.owner];
+        charge(account);
+        bin.lastAccessedAt = Date.now();
+        persistBin(lookupMatch[1], bin);
+        persistAccounts();
+        return send(req, res, 200, result);
       }
 
       const match = /^\/api\/bins\/([a-f0-9]{32})$/.exec(url.pathname);

@@ -85,6 +85,9 @@ textarea::placeholder { color: var(--muted); opacity: 1; }
 .storage-panel > summary, .request-options > summary { cursor: pointer; font-weight: 700; }
 .storage-panel[open] > summary, .request-options[open] > summary { margin-bottom: .75rem; }
 .request-row label:not(:first-child) { margin-left: .5rem; }
+.api-body-field { margin: .8rem 0; }
+.api-body-field label { display: block; font-weight: 600; }
+#api-body { min-height: 10rem; max-height: 28rem; }
 #api-url { flex: 1; min-width: min(18rem, 100%); font-family: monospace; }
 .request-options { margin-top: .9rem; padding-top: .8rem; border-top: 1px solid var(--border); }
 .auth-controls { margin-top: .9rem; padding-top: .8rem; border-top: 1px solid var(--border); }

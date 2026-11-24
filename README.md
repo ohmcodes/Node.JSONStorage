@@ -86,6 +86,7 @@ Never include the key in the URL or query string. A public `GET` request does no
 | POST | `/api/accounts` | Create an account and return its owner key once. |
 | POST | `/api/bins?visibility=public` | Create a public bin. An owner key is optional; without one the server issues a same-browser management cookie. |
 | POST | `/api/bins?visibility=private` | Create a private bin from the request body. |
+| POST | `/api/bins/:id/query` | Filter nested arrays and select matching values. Public bins can be queried without a key; private bins require the owner key. |
 | HEAD | `/api/bins/:id` | Check whether a bin exists and read its visibility header without reading the JSON or extending expiry. |
 | GET | `/api/bins/:id` | Read a bin. Public reads need only the ID; private reads need the owner key. |
 | PUT | `/api/bins/:id?visibility=public\|private` | Replace the bin's JSON value and optionally change visibility. Making a keyless Public bin private requires its owner cookie and a valid destination owner key; ownership and quota move to that account. |
@@ -103,9 +104,14 @@ curl -X POST http://127.0.0.1:3000/api/accounts
 curl -X POST 'http://127.0.0.1:3000/api/bins?visibility=private' \
   -H 'X-Secret-Key: YOUR_KEY' -H 'Content-Type: application/json' \
   --data '{"hello":"world"}'
+curl -X POST http://127.0.0.1:3000/api/bins/BIN_ID/query \
+  -H 'Content-Type: application/json' \
+  --data '{"steps":[{"array":"DinoRewards.Dinos","where":{"Blueprint":{"contains":"Dodo"}}},{"array":"Award","level":25,"select":"Points"}]}'
 curl -H 'X-Secret-Key: YOUR_KEY' http://127.0.0.1:3000/api/bins/BIN_ID
 curl -X DELETE -H 'X-Secret-Key: YOUR_KEY' http://127.0.0.1:3000/api/bins/BIN_ID
 ```
+
+Lookup filters support exact scalar values and `eq`, `ne`, `lt`, `lte`, `gt`, `gte`, `in`, and case-sensitive string `contains` operators. A lookup step can use `level` to match award objects whose numeric `MinLevel` and `MaxLevel` bounds contain that value, without specifying the bounds in the request. Use the complete Blueprint string for an exact match; use `{ "contains": "Dodo" }` to match a partial Blueprint name. A single selected result returns an object such as `{"Points":5}`; multiple matches return an array of objects, and no matches return `[]`.
 
 ## Live Request Logging
 
