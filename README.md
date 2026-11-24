@@ -1,6 +1,6 @@
 # Node.JSONStorage
 
-A self-hosted JSON editor and HTTP service for saving public or private JSON bins. It includes a browser editor, a saved-bin list, a manual CRUD tester, and a public-safe live request feed.
+A self-hosted JSON bin service built with Node.js. The server exposes an HTTP API, serves the browser client, and persists each bin as an individual JSON file.
 
 ## Requirements
 
@@ -13,10 +13,13 @@ From the repository directory:
 
 ```sh
 npm install
+cp .env.sample .env
 npm start
 ```
 
 Open http://127.0.0.1:3000. The default listener is `127.0.0.1:3000`, and data is stored in `./data`.
+
+Edit `.env` to configure the local server. On PowerShell, copy the sample with `Copy-Item .env.sample .env`.
 
 PowerShell environment overrides:
 
@@ -27,37 +30,20 @@ $env:DATA_DIR = 'C:\json-storage-data'
 npm start
 ```
 
-`PORT`, `HOST`, and `DATA_DIR` can also be set in the process environment before running `npm start`. Use one server process per data directory. For deployment, use persistent storage and HTTPS; never send secret keys over unencrypted connections.
+`PORT`, `HOST`, and `DATA_DIR` can also be set in the process environment before running `npm start`; process environment variables override `.env`. To remove an old PowerShell override and use `.env`, run `Remove-Item Env:DATA_DIR -ErrorAction SilentlyContinue` in that terminal before starting the server. Use one server process per data directory. For deployment, use persistent storage and HTTPS; never send secret keys over unencrypted connections.
 
-For local configuration, copy `.env.sample` to `.env` and edit its values. The server loads `.env` at startup; variables already present in the process environment take precedence.
+The server loads `.env` at startup. `DATA_DIR=./data` stores account data in `data/accounts.json` and each bin in `data/bins/<bin-id>.json` when started from the repository directory. Process environment values take precedence over `.env`.
 
-## Browser Workflow
+## Project Layout
 
-1. Paste JSON into the editor or use **Upload JSON**. The editor keeps a draft in this tab's `sessionStorage` and restores it after a refresh. Closing the tab clears that draft. A browser warning also appears when there is unsaved content.
-2. Open **Save and Manage Bins**, choose Public or Private, and select **Save bin**. Saving validates the JSON and writes it in formatted form before the request is sent. Invalid JSON is rejected with a line and column diagnostic.
-3. Choose visibility. Public bins can be saved without entering a key; the browser receives an HttpOnly owner cookie for same-browser updates and deletes. Private bins need an owner key. If a Private save has no key, Save generates one and stops before creating the bin. Copy it, then select Save bin again.
-4. On a successful save, the bin ID is added to the saved list in this browser's `localStorage`. The list stores only the bin ID and visibility, never the secret key. It is local to this browser and does not sync between devices.
-5. Select **Use** beside a saved bin to load its JSON into the editor. Public bins can be loaded by ID alone. Private bins require the owner key.
-6. Select **Delete** beside a saved bin to delete it from the server and remove it from this browser's list. The server verifies ownership using the owner key or, for a keyless Public bin, the creating browser's HttpOnly cookie; an ID alone is not authorization. If deletion fails, the local list entry is retained.
-7. **New bin** clears the current selection so the next Save creates a separate bin. Otherwise, Save updates the last selected bin.
+- `server.js` contains the HTTP server, API routes, authorization, file persistence, cleanup, and live-log stream.
+- `public/` contains the browser client (HTML, CSS, and JavaScript).
+- `test/` contains API and browser-script regression tests using Node's built-in test runner.
+- `data/` is the default runtime storage directory and is excluded from version control.
 
-The secret key is shown only when generated, is not recoverable, and is never persisted by the browser. Copy it to a password manager before leaving the page. A new key creates a different account and does not restore access to previous bins.
+## HTTP API
 
-## JSON Editor
-
-- **Validate JSON** checks syntax and reports the failing line and column.
-- **Format / prettify** writes indented JSON; **Compact** removes formatting whitespace.
-- **Repair** attempts to repair malformed JSON using `jsonrepair`.
-- **Upload JSON** accepts JSON files up to 1 MiB; **Download JSON** exports the current value.
-- The editor follows the operating system's light/dark preference until the theme button is used. The chosen theme is remembered when browser storage is available.
-
-## API CRUD Tester
-
-Open **API CRUD Tester** to choose a method and enter either a 32-character bin ID or an API path. `POST`, `PUT`, and `PATCH` send the editor contents as the request body. Responses appear in the Results section within the same panel.
-
-### Sending the Owner Key
-
-In the browser tester, open **Headers** and enter a key in **X-Secret-Key** to override the shared key for tester requests. If that field is blank, the tester uses the key entered under **Save and Manage Bins > Authentication**; same-browser requests for keyless Public bins also send the HttpOnly owner cookie automatically. The Authentication key field is hidden while Public is selected; select Private to show it. Both key fields are kept in page memory only.
+All endpoints are relative to the server root. JSON request bodies require `Content-Type: application/json`. Owner keys are sent with the `X-Secret-Key` header and must never be placed in a URL or query string.
 
 For `curl`, add the header explicitly:
 
@@ -118,11 +104,9 @@ curl -H 'X-Secret-Key: YOUR_KEY' http://127.0.0.1:3000/api/bins/BIN_ID
 curl -X DELETE -H 'X-Secret-Key: YOUR_KEY' http://127.0.0.1:3000/api/bins/BIN_ID
 ```
 
-## Live API Logs
+## Live Request Logging
 
-The **Live API Logs** panel is public and does not require an admin token. Select **Start** to open a stream for up to 10 minutes. **Stop** closes the stream and resets the display to `10:00 ready` for the next Start. **Clear** clears only the current viewer's list; it does not erase the server's shared in-memory history. New events append chronologically and the viewer follows the latest row. The stream also stops after 5 minutes without API activity or without a server response.
-
-The server keeps at most 200 recent events in memory and allows up to 20 concurrent log viewers by default. Events include timestamp, method, endpoint, status, duration, and public bin IDs. Private bin IDs and paths are redacted. Request bodies, secret keys, account identifiers, and IP addresses are not recorded. Logs are transient and are not written to disk.
+`GET /api/live-logs` streams sanitized events using Server-Sent Events. The server keeps at most 200 recent events in memory, allows up to 20 concurrent subscribers, and ends sessions after 10 minutes or 5 minutes without activity. Private bin IDs and paths are redacted. Request bodies, secret keys, account identifiers, and IP addresses are not recorded; events are not written to disk.
 
 ## Bin Expiration
 

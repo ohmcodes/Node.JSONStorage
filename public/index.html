@@ -142,7 +142,7 @@
       <ol>
         <li>Paste or upload JSON. Save bin validates it and formats it before sending.</li>
         <li>Choose Public or Private in Save and Manage Bins, then save. If Private has no key, Save generates one and pauses; copy it with the Copy button, then press Save bin again to create the bin.</li>
-        <li>Saved bins appear in the browser-local list. Use loads a bin into the editor; Delete removes it from the server and list after owner-key authorization.</li>
+        <li>Your bin is saved on the server. The saved-bin list on this browser keeps only its ID and visibility. Use loads a bin into the editor; Delete removes it from the server and this browser's list.</li>
         <li>The secret key is never stored in the browser. Public reads need only the ID; keyless public bins are managed by this browser's HttpOnly cookie. Private bins require the owner key.</li>
         <li>Bins expire after 30 days without a successful GET, PUT, or PATCH. Any of those operations resets the inactivity timer.</li>
         <li>Use the API CRUD Tester for manual requests; its Results section appears in the same panel. Paste either a bin ID or an API path.</li>
