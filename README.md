@@ -34,6 +34,16 @@ npm start
 
 The server loads `.env` at startup. `DATA_DIR=./data` stores account data in `data/accounts.json` and each bin in `data/bins/<bin-id>.json` when started from the repository directory. Donation destinations are configured with `PATREON_URL`, `BUY_ME_A_COFFEE_URL`, and `PAYPAL_DONATE_URL`; placeholder URLs remain disabled. Process environment values take precedence over `.env`.
 
+## Docker
+
+Copy `.env.sample` to `.env`, then run:
+
+```sh
+docker compose up -d --build
+```
+
+Compose publishes port `3012` and sets the container to bind `0.0.0.0:3012`, independent of the local `.env` port. It bind-mounts the host directory configured by `DATA_DIR` (default `./data`) into `/usr/src/app/data` in the container. Bin and account files therefore remain in the host data directory when the container is recreated. Back up that directory separately.
+
 ## Project Layout
 
 - `server.js` contains the HTTP server, API routes, authorization, file persistence, cleanup, and live-log stream.

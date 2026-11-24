@@ -1,0 +1,22 @@
+# Build and run the JSON Storage server with persistent local data.
+
+services:
+  jsonstorage:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: jsonstorage
+    restart: unless-stopped
+    ports:
+      - "3012:3012"
+    env_file:
+      - .env
+    environment:
+      PORT: 3012
+      HOST: 0.0.0.0
+      DATA_DIR: /usr/src/app/data
+    volumes:
+      - type: bind
+        source: ${DATA_DIR:-./data}
+        target: /usr/src/app/data
+
