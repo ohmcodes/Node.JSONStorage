@@ -3,6 +3,35 @@ const editor = $('editor');
 const status = $('status');
 const key = $('key');
 const id = $('id');
+const themeToggle = $('theme-toggle');
+const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
+let savedTheme;
+try {
+  savedTheme = localStorage.getItem('theme');
+} catch {
+  savedTheme = null;
+}
+if (savedTheme === 'light' || savedTheme === 'dark') {
+  document.documentElement.dataset.theme = savedTheme;
+}
+
+function updateThemeToggle() {
+  const theme = document.documentElement.dataset.theme;
+  themeToggle.setAttribute('aria-pressed', String(theme ? theme === 'dark' : systemTheme.matches));
+}
+
+updateThemeToggle();
+systemTheme.addEventListener('change', updateThemeToggle);
+themeToggle.addEventListener('click', () => {
+  const theme = themeToggle.getAttribute('aria-pressed') === 'true' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = theme;
+  try {
+    localStorage.setItem('theme', theme);
+  } catch {
+    // Keep the selected theme for this page even if storage is unavailable.
+  }
+  updateThemeToggle();
+});
 
 function message(text) {
   status.textContent = text;

@@ -13,6 +13,8 @@ npm start
 
 Open http://127.0.0.1:3000. Set `PORT`, `HOST` and `DATA_DIR` to change the listening address and storage directory. The default data directory is `./data`. Use persistent storage and HTTPS when deploying; secret keys must not be sent over an unencrypted network. This service is self-hosted: git.io is a URL shortener, not a JSON storage or hosting provider.
 
+The editor follows your system's light or dark preference until you use the Dark mode button. Your choice is saved in your browser when local storage is available.
+
 Generate an account key in the editor and save it securely. It is shown only when generated and cannot be recovered. Every account can own up to 10 MiB of JSON, with a maximum of 100 KiB per bin. Sizes are measured in UTF-8 bytes of compact JSON. Each account is limited to 10,000 successful bin API requests per UTC calendar month, including public reads by other users. Failed validation and unauthorized requests do not count.
 
 Data is stored in a local file, with key hashes rather than plaintext keys. Run only one server process per data directory; the file store does not support multiple processes or hosts. Back up the data directory separately. The service does not provide account recovery or account deletion.
