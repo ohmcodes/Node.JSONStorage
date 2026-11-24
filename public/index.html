@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JSON Storage</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main>
+    <header class="page-header">
+      <h1>JSON Storage</h1>
+      <button id="theme-toggle" type="button" aria-pressed="false">Dark mode</button>
+    </header>
+    <p>Paste or upload JSON, edit it, and save it as a public or private bin.</p>
+    <div class="toolbar">
+      <label>Upload JSON <input id="upload" type="file" accept=".json,application/json"></label>
+      <button id="validate">Validate / lint</button>
+      <button id="format">Format / prettify</button>
+      <button id="compact">Compact</button>
+      <button id="repair">Repair</button>
+      <button id="download">Download JSON</button>
+    </div>
+    <label for="editor">JSON editor</label>
+    <textarea id="editor" spellcheck="false" placeholder='{"hello": "world"}'></textarea>
+    <section>
+      <h2>Bin storage</h2>
+      <p>Generate an account key and save it somewhere safe. It is required to modify bins and read private bins; it cannot be recovered.</p>
+      <div class="field">
+        <label for="key">Secret key</label>
+        <input id="key" type="password" autocomplete="off">
+        <button id="generate">Generate key</button>
+        <button id="show-key">Show key</button>
+      </div>
+      <div class="field">
+        <label for="visibility">Visibility</label>
+        <select id="visibility"><option value="public">Public</option><option value="private">Private</option></select>
+        <button id="save">Save new bin</button>
+      </div>
+      <div class="field">
+        <label for="id">Bin ID</label>
+        <input id="id" type="text" autocomplete="off">
+        <button id="load">Get</button>
+        <button id="replace">Put</button>
+        <button id="update">Update</button>
+        <button id="delete">Delete</button>
+      </div>
+      <p>Update merges top-level JSON object fields. Put replaces the entire bin.</p>
+    </section>
+    <p id="status" role="status" aria-live="polite"></p>
+  </main>
+</body>
+</html>
