@@ -11,44 +11,172 @@
   <main>
     <header class="page-header">
       <h1>JSON Storage</h1>
-      <button id="theme-toggle" type="button" aria-pressed="false">Dark mode</button>
+      <button id="theme-toggle" class="icon-button" type="button" aria-label="Switch to dark mode" title="Switch to dark mode" aria-pressed="false" data-icon="moon">
+        <svg class="moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 15.5A8.5 8.5 0 0 1 8.5 3.5 8.5 8.5 0 1 0 20.5 15.5Z"/></svg>
+        <svg class="sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
+      </button>
     </header>
     <p>Paste or upload JSON, edit it, and save it as a public or private bin.</p>
+    <nav class="page-links" aria-label="Page guides">
+      <a href="#guide">How to use and endpoint guide</a>
+      <a href="https://github.com/ohmcodes/Node.JSONStorage#readme" target="_blank" rel="noopener noreferrer">Read README</a>
+    </nav>
     <div class="toolbar">
       <label>Upload JSON <input id="upload" type="file" accept=".json,application/json"></label>
-      <button id="validate">Validate / lint</button>
+      <button id="validate">Validate JSON</button>
       <button id="format">Format / prettify</button>
-      <button id="compact">Compact</button>
-      <button id="repair">Repair</button>
-      <button id="download">Download JSON</button>
+      <button id="compact" class="icon-button" type="button" aria-label="Compact JSON" title="Compact JSON">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V4h4m8 0h4v4M4 16v4h4m8 0h4v-4M8 8l4 4 4-4M8 16l4-4 4 4"/></svg>
+      </button>
+      <button id="repair" class="icon-button" type="button" aria-label="Repair JSON" title="Repair JSON">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a5 5 0 0 0-6.4 6.4L3 18l3 3 5.3-5.3a5 5 0 0 0 6.4-6.4L14 13l-3-3 3.7-3.7Z"/></svg>
+      </button>
+      <button id="download" class="icon-button" type="button" aria-label="Download JSON" title="Download JSON">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4"/></svg>
+      </button>
     </div>
     <label for="editor">JSON editor</label>
     <textarea id="editor" spellcheck="false" placeholder='{"hello": "world"}'></textarea>
-    <section>
-      <h2>Bin storage</h2>
-      <p>Generate an account key and save it somewhere safe. It is required to modify bins and read private bins; it cannot be recovered.</p>
-      <div class="field">
-        <label for="key">Secret key</label>
-        <input id="key" type="password" autocomplete="off">
-        <button id="generate">Generate key</button>
-        <button id="show-key">Show key</button>
-      </div>
-      <div class="field">
-        <label for="visibility">Visibility</label>
-        <select id="visibility"><option value="public">Public</option><option value="private">Private</option></select>
-        <button id="save">Save new bin</button>
-      </div>
-      <div class="field">
-        <label for="id">Bin ID</label>
-        <input id="id" type="text" autocomplete="off">
-        <button id="load">Get</button>
-        <button id="replace">Put</button>
-        <button id="update">Update</button>
-        <button id="delete">Delete</button>
-      </div>
-      <p>Update merges top-level JSON object fields. Put replaces the entire bin.</p>
-    </section>
     <p id="status" role="status" aria-live="polite"></p>
+    <p id="draft-state" class="draft-state" role="status" aria-live="polite">Draft stays in this tab and can be restored after a refresh; closing the tab clears it.</p>
+    <details id="storage-panel" class="storage-panel">
+      <summary>Save and Manage Bins</summary>
+      <fieldset class="visibility-choice">
+        <legend>New bin visibility</legend>
+        <label><input type="radio" name="visibility" value="public" checked> Public</label>
+        <label><input type="radio" name="visibility" value="private"> Private</label>
+      </fieldset>
+      <p id="visibility-note" class="request-hint">Public bins can be created and read without entering a key. This browser receives an HttpOnly owner cookie for updates and deletes; other clients need the owner key.</p>
+      <p class="request-hint">Bins are automatically deleted after 30 days without a successful GET, PUT, or PATCH. Reading or updating a bin resets its inactivity timer.</p>
+      <div class="field">
+        <button id="save-bin" type="button">
+          <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h12l4 4v14H3V3h2Zm2 0v6h10V3M7 21v-8h10v8"/></svg>
+          Save bin
+        </button>
+        <button id="new-bin" type="button">New bin</button>
+      </div>
+      <div id="auth-panel" class="auth-controls" hidden>
+        <h3>Authentication</h3>
+        <p>Private bins require the owning key for reads. Public bins saved without a key use this browser's HttpOnly owner cookie for updates and deletes. To manage public bins from another client, create them with an account key.</p>
+        <div class="field">
+          <label for="key">Secret key</label>
+          <input id="key" type="password" autocomplete="off">
+          <button id="generate" type="button">Generate key</button>
+          <button id="toggle-key" class="icon-button" type="button" aria-label="Show secret key" title="Show secret key" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+          <button id="copy-key" class="icon-button" type="button" aria-label="Copy secret key" title="Copy secret key">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h2"/></svg>
+          </button>
+          <button id="key-help" class="icon-button" type="button" aria-label="Key and recovery information" title="Key and recovery information" aria-expanded="false" aria-controls="key-help-text">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9a2.5 2.5 0 1 1 4.1 1.9c-1.1.9-1.7 1.2-1.7 2.6M12 17h.01"/></svg>
+          </button>
+        </div>
+        <p id="key-copy-state" class="key-copy-state" aria-live="polite"></p>
+        <p id="key-help-text" class="key-help-text" hidden>Copy this key to a password manager before leaving or refreshing the page. A new key creates a different account and cannot restore access to existing bins.</p>
+      </div>
+      <div id="saved-bin-field" class="field saved-bin-field" aria-live="polite" hidden>
+        <label for="saved-bin-id">Saved bin ID</label>
+        <input id="saved-bin-id" type="password" readonly autocomplete="new-password">
+        <button id="toggle-bin-id" class="icon-button" type="button" aria-label="Show bin ID" title="Show bin ID" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+        <button id="copy-bin-id" class="icon-button" type="button" aria-label="Copy bin ID" title="Copy bin ID">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h2"/></svg>
+        </button>
+      </div>
+      <h3>Saved bins</h3>
+      <p id="saved-bin-empty" class="saved-bin-empty">Bins saved in this browser will appear here.</p>
+      <ul id="saved-bin-list" class="saved-bin-list" aria-live="polite"></ul>
+      <p>Bin IDs are remembered in this browser only. The secret key is never saved here.</p>
+    </details>
+    <details id="api-panel" class="storage-panel">
+      <summary>API CRUD Tester</summary>
+      <div class="request-row">
+        <label for="api-method">Method</label>
+        <select id="api-method">
+          <option>GET</option><option>PUT</option><option>PATCH</option>
+        </select>
+        <label for="api-url">Endpoint or bin ID</label>
+        <input id="api-url" type="text" value="/api/bins" placeholder="Paste a bin ID or /api/... endpoint" autocomplete="off" spellcheck="false">
+        <button id="send-request" type="button">Send</button>
+      </div>
+      <p class="request-hint">GET reads a bin; PUT replaces it; PATCH merges top-level object fields. PUT and PATCH use the editor contents as the JSON request body. Save bin creates bins and the saved-bin list handles deletion.</p>
+      <details class="request-options">
+        <summary>Headers</summary>
+        <div class="field api-key-field">
+          <label for="api-key-header">X-Secret-Key</label>
+          <input id="api-key-header" type="password" autocomplete="off" placeholder="Optional tester key">
+        </div>
+        <p>Public GET does not need a key; this browser's HttpOnly owner cookie manages keyless public bins. Enter <code>X-Secret-Key</code> here for private GET or to manage account-owned bins from another client. The tester-only value is kept in page memory, not browser storage.</p>
+      </details>
+      <p class="request-hint">Never put a secret key in the endpoint URL or query string.</p>
+      <div id="api-results-panel" class="api-results" hidden>
+        <h3>Results</h3>
+        <pre id="response" aria-live="polite"></pre>
+      </div>
+    </details>
+    <details id="live-log-panel" class="storage-panel">
+      <summary>Live API logs</summary>
+      <p>Anyone can view a sanitized request feed. Each session lasts up to 10 minutes and stops after 5 minutes without activity or a server response. Private bin IDs, request bodies, keys, and IP addresses are hidden.</p>
+      <div class="field log-connect-row">
+        <button id="start-logs" type="button">Start</button>
+        <button id="stop-logs" type="button" disabled>Stop</button>
+        <button id="clear-logs" type="button" title="Clear events from this viewer">Clear</button>
+        <span id="logs-timer" role="timer" aria-live="off">Inactive</span>
+      </div>
+      <p id="logs-status" role="status" aria-live="polite">Disconnected</p>
+      <div class="field log-filter-row">
+        <label for="log-bin-filter">Filter by bin ID</label>
+        <input id="log-bin-filter" type="text" autocomplete="off" placeholder="Show all requests">
+      </div>
+      <div id="log-scroll-container" class="log-table-wrap" aria-live="polite">
+        <table class="logs-table">
+          <thead><tr><th>Time</th><th>Method</th><th>Endpoint</th><th>Status</th><th>Duration</th><th>Public bin ID</th></tr></thead>
+          <tbody id="log-rows"></tbody>
+        </table>
+      </div>
+    </details>
+    <section id="guide" class="guide-section">
+      <h2>How to use</h2>
+      <ol>
+        <li>Paste or upload JSON. Save bin validates it and formats it before sending.</li>
+        <li>Choose Public or Private in Save and Manage Bins, then save. If Private has no key, Save generates one and pauses; copy it with the Copy button, then press Save bin again to create the bin.</li>
+        <li>Saved bins appear in the browser-local list. Use loads a bin into the editor; Delete removes it from the server and list after owner-key authorization.</li>
+        <li>The secret key is never stored in the browser. Public reads need only the ID; keyless public bins are managed by this browser's HttpOnly cookie. Private bins require the owner key.</li>
+        <li>Bins expire after 30 days without a successful GET, PUT, or PATCH. Any of those operations resets the inactivity timer.</li>
+        <li>Use the API CRUD Tester for manual requests; its Results section appears in the same panel. Paste either a bin ID or an API path.</li>
+        <li>Live API Logs are public-safe and run for up to 10 minutes. Stop resets the timer for the next start; sessions also stop after 5 minutes idle. Clear empties this viewer, and new events auto-scroll to the latest.</li>
+      </ol>
+      <h3>API endpoints</h3>
+      <p>These paths are relative to this site; the host is added automatically. Use GET to read, PUT to replace, or PATCH to merge a saved bin. Save bin creates bins and the saved-bin list handles deletion.</p>
+      <div class="endpoint-table-wrap">
+        <table class="endpoint-table">
+          <thead><tr><th>Method</th><th>Endpoint</th><th>Purpose</th><th></th></tr></thead>
+          <tbody>
+            <tr><td>GET</td><td><code>/api/bins/YOUR_BIN_ID</code></td><td>Read a bin</td><td><a class="endpoint-use" href="#api-panel" data-method="GET" data-endpoint="/api/bins/YOUR_BIN_ID">Use endpoint</a></td></tr>
+            <tr><td>PUT</td><td><code>/api/bins/YOUR_BIN_ID</code></td><td>Replace a bin</td><td><a class="endpoint-use" href="#api-panel" data-method="PUT" data-endpoint="/api/bins/YOUR_BIN_ID">Use endpoint</a></td></tr>
+            <tr><td>PATCH</td><td><code>/api/bins/YOUR_BIN_ID</code></td><td>Merge top-level object fields</td><td><a class="endpoint-use" href="#api-panel" data-method="PATCH" data-endpoint="/api/bins/YOUR_BIN_ID">Use endpoint</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <details class="request-options">
+        <summary>Private GET, PUT, and PATCH header examples</summary>
+        <p>Replace <code>YOUR_KEY</code> and <code>YOUR_BIN_ID</code>. Public GET requests can omit the key header.</p>
+        <pre><code>GET /api/bins/YOUR_BIN_ID
+X-Secret-Key: YOUR_KEY
+
+PUT /api/bins/YOUR_BIN_ID
+X-Secret-Key: YOUR_KEY
+Content-Type: application/json
+
+PATCH /api/bins/YOUR_BIN_ID
+X-Secret-Key: YOUR_KEY
+Content-Type: application/json</code></pre>
+      </details>
+      <p>Public bins can be read by anyone. Keyless public bins can be changed or deleted only by the browser holding their HttpOnly owner cookie; private bins and other clients require the owner key. PUT replaces the full value; PATCH shallow-merges object fields.</p>
+    </section>
+    <footer class="site-footer"><a href="https://ohmcodes.com" target="_blank" rel="noopener noreferrer">ohmcodes.com</a> &copy; <span id="copyright-year">2026</span></footer>
   </main>
 </body>
 </html>
