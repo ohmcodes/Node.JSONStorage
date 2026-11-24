@@ -20,7 +20,7 @@ async function setup(t) {
     return { status: response.status, body: await response.json() };
   };
   const account = await request('/api/accounts', { method: 'POST' });
-  return { request, key: account.body.secretKey, dir };
+  return { request, key: account.body.secretKey, dir, base };
 }
 
 function options(method, key, value) {
@@ -55,8 +55,62 @@ test('public and private bins enforce ownership and support CRUD', async t => {
   assert.equal((await request(publicUrl, options('DELETE', '0'.repeat(64)))).status, 401);
   assert.equal((await request(publicUrl, options('DELETE', key))).status, 200);
   assert.equal(fs.existsSync(path.join(dir, 'bins', `${publicBin.body.id}.json`)), false);
+  const accountsAfterDelete = JSON.parse(fs.readFileSync(path.join(dir, 'accounts.json'), 'utf8'));
+  const owner = crypto.createHash('sha256').update(key).digest('hex');
+  assert.equal(accountsAfterDelete[owner].bytes, 0);
   assert.equal(fs.readFileSync(path.join(dir, 'accounts.json'), 'utf8').includes(key), false);
   assert.equal(fs.existsSync(path.join(dir, 'storage.json')), false);
+});
+
+test('HEAD checks saved-bin state without reading or extending bin usage', async t => {
+  const { request, key, dir, base } = await setup(t);
+  const created = await request('/api/bins?visibility=public', options('POST', key, { available: true }));
+  const url = `${base}/api/bins/${created.body.id}`;
+  const file = path.join(dir, 'bins', `${created.body.id}.json`);
+  const beforeBin = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const beforeAccount = JSON.parse(fs.readFileSync(path.join(dir, 'accounts.json'), 'utf8'))[
+    crypto.createHash('sha256').update(key).digest('hex')
+  ];
+
+  const head = await fetch(url, { method: 'HEAD' });
+  assert.equal(head.status, 204);
+  assert.equal(head.headers.get('x-bin-visibility'), 'public');
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), beforeBin);
+  assert.deepEqual(
+    JSON.parse(fs.readFileSync(path.join(dir, 'accounts.json'), 'utf8'))[
+      crypto.createHash('sha256').update(key).digest('hex')
+    ],
+    beforeAccount
+  );
+
+  const missing = await fetch(`${base}/api/bins/${'0'.repeat(32)}`, { method: 'HEAD' });
+  assert.equal(missing.status, 404);
+
+  const privateBin = await request('/api/bins?visibility=private', options('POST', key, { private: true }));
+  const privateHead = await fetch(`${base}/api/bins/${privateBin.body.id}`, { method: 'HEAD' });
+  assert.equal(privateHead.status, 401);
+  assert.equal(privateHead.headers.get('x-bin-visibility'), 'private');
+});
+
+test('public app config returns only donation URL settings', async t => {
+  const { request } = await setup(t);
+  const response = await request('/api/config');
+  assert.equal(response.status, 200);
+  assert.deepEqual(Object.keys(response.body).sort(), ['donations']);
+  assert.deepEqual(Object.keys(response.body.donations).sort(), ['buyMeACoffee', 'patreon', 'paypal']);
+  assert.ok(Object.values(response.body.donations).every(value => typeof value === 'string'));
+});
+
+test('serves browser ES modules as JavaScript', async t => {
+  const { base } = await setup(t);
+  const modules = ['app.js', 'core.js', 'api.js', 'bins.js', 'bin-sync.js', 'live-logs.js', 'actions.js', 'events.js', 'donations.js', 'theme.js', 'draft.js'];
+  for (const moduleName of modules) {
+    const response = await fetch(`${base}/${moduleName}`);
+    assert.equal(response.status, 200, moduleName);
+    assert.match(response.headers.get('content-type'), /text\/javascript/, moduleName);
+  }
+  const page = await fetch(`${base}/`);
+  assert.match(await page.text(), /<script type="module" src="\/app\.js"><\/script>/);
 });
 
 test('validates input, size limits and repairs JSON', async t => {
@@ -90,6 +144,7 @@ test('keyless Public bins use an HttpOnly owner cookie for mutations', async t =
   assert.match(cookie, /HttpOnly/);
   assert.match(cookie, /SameSite=Strict/);
   const cookieHeader = cookie.split(';')[0];
+  const cookieOwnerHash = crypto.createHash('sha256').update(cookieHeader.split('=')[1]).digest('hex');
   const { id } = await createdResponse.json();
   const url = `${base}/api/bins/${id}`;
 
@@ -100,7 +155,70 @@ test('keyless Public bins use an HttpOnly owner cookie for mutations', async t =
     headers: { cookie: cookieHeader, 'content-type': 'application/json' },
     body: JSON.stringify({ edited: true })
   })).status, 200);
-  assert.equal((await fetch(url, { method: 'DELETE', headers: { cookie: cookieHeader } })).status, 200);
+
+  const accountResponse = await fetch(`${base}/api/accounts`, { method: 'POST' });
+  const { secretKey } = await accountResponse.json();
+  const privateValue = { private: true };
+  assert.equal((await fetch(`${url}?visibility=private`, {
+    method: 'PUT',
+    headers: { 'x-secret-key': secretKey, 'content-type': 'application/json' },
+    body: JSON.stringify(privateValue)
+  })).status, 401);
+  assert.equal((await fetch(`${url}?visibility=private`, {
+    method: 'PUT',
+    headers: {
+      cookie: cookieHeader,
+      'x-secret-key': secretKey,
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify(privateValue)
+  })).status, 200);
+  assert.equal((await fetch(url)).status, 401);
+  assert.deepEqual(await (await fetch(url, { headers: { 'x-secret-key': secretKey } })).json(), privateValue);
+
+  const binFile = path.join(dir, 'bins', `${id}.json`);
+  const privateBin = JSON.parse(fs.readFileSync(binFile, 'utf8'));
+  assert.equal(privateBin.visibility, 'private');
+  assert.equal(privateBin.owner, crypto.createHash('sha256').update(secretKey).digest('hex'));
+  const accounts = JSON.parse(fs.readFileSync(path.join(dir, 'accounts.json'), 'utf8'));
+  assert.equal(Object.hasOwn(accounts, cookieOwnerHash), false);
+  assert.equal(accounts[privateBin.owner].bytes, Buffer.byteLength(JSON.stringify(privateValue)));
+
+  const publicValue = { public: true };
+  assert.equal((await fetch(`${url}?visibility=public`, {
+    method: 'PUT',
+    headers: { 'x-secret-key': secretKey, 'content-type': 'application/json' },
+    body: JSON.stringify(publicValue)
+  })).status, 200);
+  assert.deepEqual(await (await fetch(url)).json(), publicValue);
+  assert.equal(JSON.parse(fs.readFileSync(binFile, 'utf8')).visibility, 'public');
+  assert.equal((await fetch(url, { method: 'DELETE', headers: { 'x-secret-key': secretKey } })).status, 200);
+});
+
+test('deleting the last cookie-owned bin removes its orphan account record', async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'json-storage-orphan-cookie-'));
+  const server = createServer({ dataDir: dir });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise(resolve => server.close(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+    resolve();
+  })));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const created = await fetch(`${base}/api/bins?visibility=public`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ temporary: true })
+  });
+  const cookie = created.headers.get('set-cookie').split(';')[0];
+  const cookieOwner = crypto.createHash('sha256').update(cookie.split('=')[1]).digest('hex');
+  const { id } = await created.json();
+
+  assert.equal((await fetch(`${base}/api/bins/${id}`, {
+    method: 'DELETE',
+    headers: { cookie }
+  })).status, 200);
+  const accounts = JSON.parse(fs.readFileSync(path.join(dir, 'accounts.json'), 'utf8'));
+  assert.equal(Object.hasOwn(accounts, cookieOwner), false);
 });
 
 test('persists bins and enforces the monthly request limit', async t => {
@@ -180,7 +298,7 @@ test('rebuilds account quota after a bin file is manually removed', async t => {
   const binsDir = path.join(dir, 'bins');
   fs.mkdirSync(binsDir);
   fs.writeFileSync(path.join(dir, 'accounts.json'), JSON.stringify({
-    [owner]: { bytes: 42, month: '', requests: 0 }
+    [owner]: { bytes: 42, month: '', requests: 0, ephemeral: true }
   }));
   fs.writeFileSync(path.join(binsDir, `${id}.json`), JSON.stringify({
     owner, visibility: 'public', value: 'x'.repeat(40), bytes: 42
@@ -188,13 +306,13 @@ test('rebuilds account quota after a bin file is manually removed', async t => {
 
   fs.rmSync(path.join(binsDir, `${id}.json`));
   const server = createServer({ dataDir: dir });
-  assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'accounts.json'), 'utf8'))[owner].bytes, 0);
+  assert.equal(Object.hasOwn(JSON.parse(fs.readFileSync(path.join(dir, 'accounts.json'), 'utf8')), owner), false);
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise(resolve => server.close(() => {
     fs.rmSync(dir, { recursive: true, force: true });
     resolve();
   })));
-  const response = await fetch(`http://127.0.0.1:${server.address().port}/api/bins?visibility=public`, options('POST', key, { available: true }));
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/api/bins?visibility=public`, options('POST', null, { available: true }));
   assert.equal(response.status, 201);
 });
 

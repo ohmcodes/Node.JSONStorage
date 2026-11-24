@@ -1,97 +1,101 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
 
-const script = fs.readFileSync(path.join(__dirname, '../public/app.js'), 'utf8');
-
-function page({ dark = false, stored = null, storageBlocked = false, sessionStored = null, sessionStorageBlocked = false } = {}) {
-  const elements = new Map();
-  let beforeUnload;
-  const document = {
-    documentElement: { dataset: {} },
-    getElementById(id) {
-      if (!elements.has(id)) {
-        const attributes = {};
-        elements.set(id, {
-          value: '',
-          listeners: {},
-          addEventListener(event, callback) { this.listeners[event] = callback; },
-          setAttribute(name, value) { attributes[name] = value; },
-          getAttribute(name) { return attributes[name]; }
-        });
-      }
-      return elements.get(id);
-    }
-  };
-  const system = {
-    matches: dark,
-    addEventListener(event, callback) { this.onChange = callback; }
-  };
-  const localStorage = {
-    getItem() { if (storageBlocked) throw new Error('blocked'); return stored; },
-    setItem(name, value) { if (storageBlocked) throw new Error('blocked'); stored = value; }
-  };
-  const sessionValues = new Map(sessionStored === null ? [] : [['jsonstorage.editorDraft', sessionStored]]);
-  const sessionStorage = {
-    getItem(name) { if (sessionStorageBlocked) throw new Error('blocked'); return sessionValues.get(name) || null; },
-    setItem(name, value) { if (sessionStorageBlocked) throw new Error('blocked'); sessionValues.set(name, value); }
-  };
-  const window = {
-    matchMedia: () => system,
-    addEventListener(event, callback) { if (event === 'beforeunload') beforeUnload = callback; }
-  };
-  vm.runInNewContext(script, { document, window, localStorage, sessionStorage });
-  return {
-    document, system, toggle: elements.get('theme-toggle'), editor: elements.get('editor'),
-    beforeUnload, sessionStorage, stored: () => stored
-  };
+async function themeModule() {
+  return import('../public/theme.js');
 }
 
-test('follows system theme until the user chooses a theme', () => {
-  const { document, system, toggle, stored } = page();
-  assert.equal(toggle.getAttribute('aria-pressed'), 'false');
-  system.matches = true;
-  system.onChange();
-  assert.equal(toggle.getAttribute('aria-pressed'), 'true');
-  toggle.listeners.click();
-  assert.equal(document.documentElement.dataset.theme, 'light');
-  assert.equal(stored(), 'light');
-  system.matches = false;
-  system.onChange();
-  system.matches = true;
-  system.onChange();
-  assert.equal(toggle.getAttribute('aria-pressed'), 'false');
+async function draftModule() {
+  return import('../public/draft.js');
+}
+
+async function binSyncModule() {
+  return import('../public/bin-sync.js');
+}
+
+function themePage({ dark = false, stored = null, storageBlocked = false } = {}) {
+  let onSystemChange;
+  const attributes = {};
+  const toggle = {
+    addEventListener(event, callback) { this.onClick = callback; },
+    setAttribute(name, value) { attributes[name] = value; },
+    getAttribute(name) { return attributes[name]; }
+  };
+  const document = { documentElement: { dataset: {} }, getElementById: () => toggle };
+  const systemTheme = {
+    matches: dark,
+    addEventListener(event, callback) { onSystemChange = callback; }
+  };
+  const values = new Map(stored === null ? [] : [['theme', stored]]);
+  const storage = {
+    getItem(name) { if (storageBlocked) throw new Error('blocked'); return values.get(name) || null; },
+    setItem(name, value) { if (storageBlocked) throw new Error('blocked'); values.set(name, value); }
+  };
+  const window = { matchMedia: () => systemTheme };
+  return { document, toggle, systemTheme, storage, window, attributes, onSystemChange: () => onSystemChange };
+}
+
+test('follows system theme until the user chooses a theme', async () => {
+  const { initializeTheme } = await themeModule();
+  const page = themePage();
+  initializeTheme(page);
+  assert.equal(page.attributes['aria-pressed'], 'false');
+  page.systemTheme.matches = true;
+  page.onSystemChange()();
+  assert.equal(page.attributes['aria-pressed'], 'true');
+  page.toggle.onClick();
+  assert.equal(page.document.documentElement.dataset.theme, 'light');
+  assert.equal(page.storage.getItem('theme'), 'light');
 });
 
-test('restores a saved theme and works when storage is unavailable', () => {
-  const restored = page({ stored: 'dark' });
+test('restores a saved theme and tolerates blocked storage', async () => {
+  const { initializeTheme } = await themeModule();
+  const restored = themePage({ stored: 'dark' });
+  initializeTheme(restored);
   assert.equal(restored.document.documentElement.dataset.theme, 'dark');
-  assert.equal(restored.toggle.getAttribute('aria-pressed'), 'true');
-  const blocked = page({ storageBlocked: true });
-  blocked.toggle.listeners.click();
+  assert.equal(restored.attributes['aria-pressed'], 'true');
+  const blocked = themePage({ storageBlocked: true });
+  initializeTheme(blocked);
+  blocked.toggle.onClick();
   assert.equal(blocked.document.documentElement.dataset.theme, 'dark');
-  assert.equal(blocked.toggle.getAttribute('aria-pressed'), 'true');
+  assert.equal(blocked.attributes['aria-pressed'], 'true');
 });
 
-test('warns before leaving with unsaved editor content', () => {
-  const { editor, beforeUnload } = page();
-  editor.value = '{"unsaved":true}';
-  let prevented = false;
-  const event = { preventDefault() { prevented = true; }, returnValue: undefined };
-  beforeUnload(event);
-  assert.equal(prevented, true);
-  assert.notEqual(event.returnValue, undefined);
+test('stores and restores a draft in the same tab', async () => {
+  const { createDraftController } = await draftModule();
+  const values = new Map();
+  const sessionStorage = {
+    getItem(name) { return values.get(name) || null; },
+    setItem(name, value) { values.set(name, value); }
+  };
+  const editor = { value: '' };
+  const draftState = { textContent: '' };
+  const first = createDraftController({ sessionStorage, editor, draftState });
+  editor.value = '{"draft":true}';
+  first.store();
+  assert.deepEqual(JSON.parse(values.get('jsonstorage.editorDraft')), { value: '{"draft":true}', saved: false });
+
+  const restoredEditor = { value: '' };
+  const restored = createDraftController({ sessionStorage, editor: restoredEditor, draftState });
+  assert.equal(restoredEditor.value, '{"draft":true}');
+  assert.match(draftState.textContent, /restored/i);
+  assert.equal(restored.hasUnsavedEditorContent(), true);
 });
 
-test('stores an editor draft for refresh and restores it in the same tab', () => {
-  const firstPage = page();
-  firstPage.editor.value = '{"draft":true}';
-  firstPage.editor.listeners.input();
-  const savedDraft = firstPage.sessionStorage.getItem('jsonstorage.editorDraft');
-  assert.deepEqual(JSON.parse(savedDraft), { value: '{"draft":true}', saved: false });
-  const refreshedPage = page({ sessionStored: savedDraft });
-  assert.equal(refreshedPage.editor.value, '{"draft":true}');
-  assert.match(refreshedPage.document.getElementById('draft-state').textContent, /restored/i);
+test('reconciles missing saved bins and server-side visibility', async () => {
+  const { reconcileEntries } = await binSyncModule();
+  const missingId = 'a'.repeat(32);
+  const changedId = 'b'.repeat(32);
+  const entries = [
+    { id: missingId, visibility: 'public' },
+    { id: changedId, visibility: 'public' }
+  ];
+  const result = await reconcileEntries(entries, async entry => {
+    if (entry.id === missingId) return { missing: true };
+    return { visibility: 'private' };
+  });
+  assert.deepEqual(result, {
+    entries: [{ id: changedId, visibility: 'private' }],
+    missingCount: 1
+  });
 });

@@ -32,12 +32,14 @@ npm start
 
 `PORT`, `HOST`, and `DATA_DIR` can also be set in the process environment before running `npm start`; process environment variables override `.env`. To remove an old PowerShell override and use `.env`, run `Remove-Item Env:DATA_DIR -ErrorAction SilentlyContinue` in that terminal before starting the server. Use one server process per data directory. For deployment, use persistent storage and HTTPS; never send secret keys over unencrypted connections.
 
-The server loads `.env` at startup. `DATA_DIR=./data` stores account data in `data/accounts.json` and each bin in `data/bins/<bin-id>.json` when started from the repository directory. Process environment values take precedence over `.env`.
+The server loads `.env` at startup. `DATA_DIR=./data` stores account data in `data/accounts.json` and each bin in `data/bins/<bin-id>.json` when started from the repository directory. Donation destinations are configured with `PATREON_URL`, `BUY_ME_A_COFFEE_URL`, and `PAYPAL_DONATE_URL`; placeholder URLs remain disabled. Process environment values take precedence over `.env`.
 
 ## Project Layout
 
 - `server.js` contains the HTTP server, API routes, authorization, file persistence, cleanup, and live-log stream.
-- `public/` contains the browser client (HTML, CSS, and JavaScript).
+- `public/app.js` is the ES-module entry point; `events.js` binds listeners, `actions.js` contains user actions, `api.js` handles HTTP requests, `bins.js` manages saved bins, and `live-logs.js` owns the event stream.
+- `public/core.js`, `draft.js`, `theme.js`, and `bin-sync.js` provide shared state and focused browser helpers. `donations.js` activates links configured in `.env`.
+- `public/index.html` and `style.css` contain the page structure and presentation.
 - `test/` contains API and browser-script regression tests using Node's built-in test runner.
 - `data/` is the default runtime storage directory and is excluded from version control.
 
@@ -84,14 +86,15 @@ Never include the key in the URL or query string. A public `GET` request does no
 | POST | `/api/accounts` | Create an account and return its owner key once. |
 | POST | `/api/bins?visibility=public` | Create a public bin. An owner key is optional; without one the server issues a same-browser management cookie. |
 | POST | `/api/bins?visibility=private` | Create a private bin from the request body. |
+| HEAD | `/api/bins/:id` | Check whether a bin exists and read its visibility header without reading the JSON or extending expiry. |
 | GET | `/api/bins/:id` | Read a bin. Public reads need only the ID; private reads need the owner key. |
-| PUT | `/api/bins/:id` | Replace the bin's JSON value. Owner key or creating-browser cookie required for keyless Public bins. |
+| PUT | `/api/bins/:id?visibility=public\|private` | Replace the bin's JSON value and optionally change visibility. Making a keyless Public bin private requires its owner cookie and a valid destination owner key; ownership and quota move to that account. |
 | PATCH | `/api/bins/:id` | Shallow-merge an object into the bin's JSON value. Owner key or creating-browser cookie required for keyless Public bins. |
 | DELETE | `/api/bins/:id` | Delete the bin. Owner key or creating-browser cookie required for keyless Public bins. |
 | POST | `/api/repair` | Repair malformed JSON text and return formatted JSON. |
 | GET | `/api/live-logs` | Public Server-Sent Events stream for the live log panel. |
 
-Private reads and cross-client writes/deletes require the owning key in `X-Secret-Key`. Keyless Public bins use a random HttpOnly, `SameSite=Strict` cookie on the creating browser for updates/deletes. The bin ID alone never authorizes a change or deletion. Never put a key in a URL.
+Private reads and cross-client writes/deletes require the owning key in `X-Secret-Key`. Keyless Public bins use a random HttpOnly, `SameSite=Strict` cookie on the creating browser for updates/deletes. A visibility change on `PUT` requires authorization for the current bin; making it Private also requires a valid destination owner key. The bin ID alone never authorizes a change or deletion. Never put a key in a URL.
 
 Example using curl (replace `YOUR_KEY` and `BIN_ID`):
 
@@ -120,7 +123,7 @@ Each bin is automatically deleted after 30 days without a successful `GET`, `PUT
 - Maximum successful bin API requests: 10,000 per account per UTC month
 - Bin inactivity expiration: 30 days since the last successful GET, PUT, or PATCH
 
-The server stores account metadata in `DATA_DIR/accounts.json` and each bin in its own file under `DATA_DIR/bins/<bin-id>.json`. A bin file contains its owner-key hash, visibility, JSON value, and size; the account index contains quota and request counters but never plaintext keys. This makes individual bin files removable without rewriting one large storage document. Prefer the app's Delete action because it also updates the owner's quota; manual file removal should be done while the server is stopped.
+The server stores account metadata in `DATA_DIR/accounts.json` and each bin in its own file under `DATA_DIR/bins/<bin-id>.json`. A bin file contains its owner-key hash, visibility, JSON value, and size; the account index contains quota and request counters but never plaintext keys. Keyed account records are retained after their last bin is deleted so the key and monthly counters remain valid. Cookie-only account records are removed when their last bin is deleted or transferred, and startup removes marked cookie-only records left with no bins after manual file removal. Prefer the app's Delete action because it also updates the owner's quota; manual file removal should be done while the server is stopped. The browser checks saved IDs against the server on page load/focus and removes entries for missing bins.
 
 On startup, an existing `DATA_DIR/storage.json` is migrated into `accounts.json` and per-bin files, then renamed to `storage.json.migrated` (or a numbered variant if that archive name already exists). Public reads by other users count toward the bin owner's monthly request allowance. Failed validation and unauthorized requests do not count.
 

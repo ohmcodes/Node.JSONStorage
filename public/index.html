@@ -5,16 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>JSON Storage</title>
   <link rel="stylesheet" href="/style.css">
-  <script src="/app.js" defer></script>
+  <script type="module" src="/app.js"></script>
 </head>
 <body>
   <main>
     <header class="page-header">
       <h1>JSON Storage</h1>
-      <button id="theme-toggle" class="icon-button" type="button" aria-label="Switch to dark mode" title="Switch to dark mode" aria-pressed="false" data-icon="moon">
-        <svg class="moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 15.5A8.5 8.5 0 0 1 8.5 3.5 8.5 8.5 0 1 0 20.5 15.5Z"/></svg>
-        <svg class="sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
-      </button>
+      <nav class="header-actions" aria-label="Support and appearance">
+        <a id="patreon-link" class="donation-link" aria-disabled="true" title="Set PATREON_URL in .env">Patreon</a>
+        <a id="coffee-link" class="donation-link" aria-disabled="true" title="Set BUY_ME_A_COFFEE_URL in .env">Buy me a coffee</a>
+        <a id="paypal-link" class="donation-link" aria-disabled="true" title="Set PAYPAL_DONATE_URL in .env">Donate with PayPal</a>
+        <button id="theme-toggle" class="icon-button" type="button" aria-label="Switch to dark mode" title="Switch to dark mode" aria-pressed="false" data-icon="moon">
+          <svg class="moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 15.5A8.5 8.5 0 0 1 8.5 3.5 8.5 8.5 0 1 0 20.5 15.5Z"/></svg>
+          <svg class="sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
+        </button>
+      </nav>
     </header>
     <p>Paste or upload JSON, edit it, and save it as a public or private bin.</p>
     <nav class="page-links" aria-label="Page guides">
@@ -42,11 +47,11 @@
     <details id="storage-panel" class="storage-panel">
       <summary>Save and Manage Bins</summary>
       <fieldset class="visibility-choice">
-        <legend>New bin visibility</legend>
+        <legend>Bin visibility</legend>
         <label><input type="radio" name="visibility" value="public" checked> Public</label>
         <label><input type="radio" name="visibility" value="private"> Private</label>
       </fieldset>
-      <p id="visibility-note" class="request-hint">Public bins can be created and read without entering a key. This browser receives an HttpOnly owner cookie for updates and deletes; other clients need the owner key.</p>
+      <p id="visibility-note" class="request-hint">Public bins can be read without a key. Changing visibility and saving updates the selected bin; making a keyless Public bin private requires a new owner key.</p>
       <p class="request-hint">Bins are automatically deleted after 30 days without a successful GET, PUT, or PATCH. Reading or updating a bin resets its inactivity timer.</p>
       <div class="field">
         <button id="save-bin" type="button">
@@ -55,6 +60,7 @@
         </button>
         <button id="new-bin" type="button">New bin</button>
       </div>
+      <p id="storage-status" class="area-status" role="status" aria-live="polite"></p>
       <div id="auth-panel" class="auth-controls" hidden>
         <h3>Authentication</h3>
         <p>Private bins require the owning key for reads. Public bins saved without a key use this browser's HttpOnly owner cookie for updates and deletes. To manage public bins from another client, create them with an account key.</p>
@@ -73,6 +79,7 @@
           </button>
         </div>
         <p id="key-copy-state" class="key-copy-state" aria-live="polite"></p>
+        <p id="key-error" class="key-error" role="alert" hidden></p>
         <p id="key-help-text" class="key-help-text" hidden>Copy this key to a password manager before leaving or refreshing the page. A new key creates a different account and cannot restore access to existing bins.</p>
       </div>
       <div id="saved-bin-field" class="field saved-bin-field" aria-live="polite" hidden>
@@ -113,6 +120,7 @@
       <p class="request-hint">Never put a secret key in the endpoint URL or query string.</p>
       <div id="api-results-panel" class="api-results" hidden>
         <h3>Results</h3>
+        <p id="api-status" class="area-status" role="status" aria-live="polite"></p>
         <pre id="response" aria-live="polite"></pre>
       </div>
     </details>
@@ -141,8 +149,8 @@
       <h2>How to use</h2>
       <ol>
         <li>Paste or upload JSON. Save bin validates it and formats it before sending.</li>
-        <li>Choose Public or Private in Save and Manage Bins, then save. If Private has no key, Save generates one and pauses; copy it with the Copy button, then press Save bin again to create the bin.</li>
-        <li>Your bin is saved on the server. The saved-bin list on this browser keeps only its ID and visibility. Use loads a bin into the editor; Delete removes it from the server and this browser's list.</li>
+        <li>Choose Public or Private in Save and Manage Bins, then save. Changing visibility updates the selected bin. If Private has no key, Save generates one and pauses; copy it with the Copy button, then press Save bin again to create or update the bin.</li>
+        <li>Your bin is saved on the server. The saved-bin list on this browser keeps only its ID and visibility, and refreshes when the page opens or returns to focus. Missing bins are removed and visibility is updated from the server. Use loads a bin into the editor; Delete removes it from the server and this browser's list.</li>
         <li>The secret key is never stored in the browser. Public reads need only the ID; keyless public bins are managed by this browser's HttpOnly cookie. Private bins require the owner key.</li>
         <li>Bins expire after 30 days without a successful GET, PUT, or PATCH. Any of those operations resets the inactivity timer.</li>
         <li>Use the API CRUD Tester for manual requests; its Results section appears in the same panel. Paste either a bin ID or an API path.</li>

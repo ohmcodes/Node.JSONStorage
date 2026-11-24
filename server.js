@@ -60,6 +60,7 @@ function createServer({
 
   function reconcileAccountBytes() {
     const previousBytes = new Map();
+    let accountsChanged = false;
     for (const [owner, account] of Object.entries(accounts)) {
       previousBytes.set(owner, account.bytes || 0);
       account.bytes = 0;
@@ -74,7 +75,13 @@ function createServer({
         ? bin.bytes
         : Buffer.byteLength(JSON.stringify(bin.value));
     }
-    if (Object.entries(accounts).some(([owner, account]) => previousBytes.get(owner) !== account.bytes)) {
+    for (const [owner, account] of Object.entries(accounts)) {
+      if (account.ephemeral && account.bytes === 0) {
+        delete accounts[owner];
+        accountsChanged = true;
+      }
+    }
+    if (accountsChanged || Object.entries(accounts).some(([owner, account]) => previousBytes.get(owner) !== account.bytes)) {
       persistAccounts();
     }
   }
@@ -175,15 +182,21 @@ function createServer({
     return Buffer.byteLength(JSON.stringify(value));
   }
 
-  function accountFor(req) {
+  function secretKeyOwnerFor(req) {
     const key = req.headers['x-secret-key'];
-    if (typeof key === 'string' && key.trim()) {
-      if (!/^[a-f0-9]{64}$/.test(key.trim())) return null;
-      return crypto.createHash('sha256').update(key.trim()).digest('hex');
-    }
+    if (typeof key !== 'string' || !/^[a-f0-9]{64}$/.test(key.trim())) return null;
+    return crypto.createHash('sha256').update(key.trim()).digest('hex');
+  }
+
+  function cookieOwnerFor(req) {
     const cookie = req.headers.cookie || '';
     const ownerCookie = /(?:^|;\s*)bin_owner=([a-f0-9]{64})(?:;|$)/.exec(cookie);
     return ownerCookie ? crypto.createHash('sha256').update(ownerCookie[1]).digest('hex') : null;
+  }
+
+  function accountFor(req) {
+    const key = req.headers['x-secret-key'];
+    return typeof key === 'string' && key.trim() ? secretKeyOwnerFor(req) : cookieOwnerFor(req);
   }
 
   function hasSecretKey(req) {
@@ -225,11 +238,21 @@ function createServer({
     res.setHeader('Content-Security-Policy', "default-src 'self'; style-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'");
     try {
       const url = new URL(req.url, 'http://localhost');
-      if (req.method === 'GET' && ['/', '/app.js', '/style.css'].includes(url.pathname)) {
+      if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/style.css' || /^\/[a-z][a-z0-9-]*\.js$/.test(url.pathname))) {
         const name = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
         const type = name.endsWith('.html') ? 'text/html' : name.endsWith('.js') ? 'text/javascript' : 'text/css';
         res.writeHead(200, { 'Content-Type': `${type}; charset=utf-8`, 'Cache-Control': 'no-store' });
         return res.end(fs.readFileSync(path.join(__dirname, 'public', name)));
+      }
+
+      if (req.method === 'GET' && url.pathname === '/api/config') {
+        return send(req, res, 200, {
+          donations: {
+            patreon: process.env.PATREON_URL || '',
+            buyMeACoffee: process.env.BUY_ME_A_COFFEE_URL || '',
+            paypal: process.env.PAYPAL_DONATE_URL || ''
+          }
+        });
       }
 
       if (req.method === 'GET' && url.pathname === '/api/live-logs') {
@@ -296,7 +319,7 @@ function createServer({
         if (!account && visibility === 'public') {
           newOwnerCookie = crypto.randomBytes(32).toString('hex');
           owner = crypto.createHash('sha256').update(newOwnerCookie).digest('hex');
-          account = accounts[owner] = { bytes: 0, month: '', requests: 0 };
+          account = accounts[owner] = { bytes: 0, month: '', requests: 0, ephemeral: true };
         }
         const bytes = checkSize(value, account);
         charge(account);
@@ -313,12 +336,31 @@ function createServer({
 
       const match = /^\/api\/bins\/([a-f0-9]{32})$/.exec(url.pathname);
       if (!match) fail(404, 'Not found');
-      if (!['GET', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) fail(405, 'Method not allowed');
+      if (!['GET', 'HEAD', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) fail(405, 'Method not allowed');
       const bin = readBin(match[1]);
       if (!bin) fail(404, 'Not found');
-      req.binVisibility = bin.visibility;
+      if (req.method === 'HEAD') {
+        const authorized = bin.visibility !== 'private' || accountFor(req) === bin.owner;
+        res.writeHead(authorized ? 204 : 401, {
+          'Cache-Control': 'no-store',
+          'X-Bin-Visibility': bin.visibility
+        });
+        res.end();
+        return;
+      }
+      const requestedVisibility = req.method === 'PUT' && url.searchParams.has('visibility')
+        ? url.searchParams.get('visibility')
+        : null;
+      if (requestedVisibility !== null && !['public', 'private'].includes(requestedVisibility)) {
+        fail(400, 'Visibility must be public or private');
+      }
+      const visibility = requestedVisibility || bin.visibility;
+      req.binVisibility = visibility;
       const owner = accountFor(req);
-      if ((bin.visibility === 'private' || req.method !== 'GET') && owner !== bin.owner) {
+      const cookieOwner = cookieOwnerFor(req);
+      const cookieAuthorizedVisibilityChange = requestedVisibility !== null && cookieOwner === bin.owner;
+      if ((bin.visibility === 'private' || req.method !== 'GET') &&
+          owner !== bin.owner && !cookieAuthorizedVisibilityChange) {
         fail(401, 'Valid secret key required');
       }
       const account = accounts[bin.owner];
@@ -331,8 +373,11 @@ function createServer({
       }
       if (req.method === 'DELETE') {
         charge(account);
-        account.bytes -= bin.bytes;
+        account.bytes = Math.max(0, account.bytes - bin.bytes);
         removeBinFile(match[1]);
+        if (cookieOwnerFor(req) === bin.owner && secretKeyOwnerFor(req) !== bin.owner && account.bytes === 0) {
+          delete accounts[bin.owner];
+        }
         persistAccounts();
         return send(req, res, 200, { deleted: true });
       }
@@ -344,9 +389,21 @@ function createServer({
         }
         value = { ...bin.value, ...value };
       }
-      const bytes = checkSize(value, account, bin.bytes);
-      charge(account);
-      account.bytes += bytes - bin.bytes;
+      const nextOwner = visibility === 'private' ? secretKeyOwnerFor(req) : bin.owner;
+      const nextAccount = nextOwner && accounts[nextOwner];
+      if (!nextAccount) fail(401, 'Valid secret key required');
+      const ownershipChanged = nextOwner !== bin.owner;
+      const bytes = checkSize(value, nextAccount, ownershipChanged ? 0 : bin.bytes);
+      charge(nextAccount);
+      if (ownershipChanged) {
+        account.bytes = Math.max(0, account.bytes - bin.bytes);
+        if (cookieAuthorizedVisibilityChange && account.bytes === 0) delete accounts[bin.owner];
+        nextAccount.bytes += bytes;
+        bin.owner = nextOwner;
+      } else {
+        nextAccount.bytes += bytes - bin.bytes;
+      }
+      bin.visibility = visibility;
       bin.value = value;
       bin.bytes = bytes;
       bin.lastAccessedAt = Date.now();
