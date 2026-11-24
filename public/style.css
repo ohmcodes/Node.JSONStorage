@@ -1,0 +1,11 @@
+* { box-sizing: border-box; }
+body { margin: 0; background: #f3f5f8; color: #172033; font: 16px system-ui, sans-serif; }
+main { max-width: 1050px; margin: auto; padding: 1.5rem; }
+h1, h2 { margin-bottom: .4rem; }
+.toolbar, .field { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin: .8rem 0; }
+button, input, select { font: inherit; padding: .45rem; }
+button { cursor: pointer; }
+input[type="text"], input[type="password"] { flex: 1; min-width: 14rem; }
+textarea { display: block; width: 100%; min-height: 22rem; margin-top: .5rem; padding: .8rem; font: 14px/1.5 monospace; resize: vertical; }
+section { margin-top: 1.5rem; }
+#status { min-height: 1.5em; font-weight: 600; overflow-wrap: anywhere; }

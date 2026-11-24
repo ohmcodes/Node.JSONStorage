@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const { createServer } = require('../server');
 
 async function setup(t) {
@@ -73,4 +74,26 @@ test('persists bins and enforces the monthly request limit', async t => {
   t.after(() => new Promise(resolve => restarted.close(resolve)));
   const response = await fetch(`http://127.0.0.1:${restarted.address().port}/api/bins/${bin.body.id}`);
   assert.equal(response.status, 429);
+});
+
+test('enforces account quota and frees space on delete', async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'json-storage-quota-'));
+  const key = crypto.randomBytes(32).toString('hex');
+  const owner = crypto.createHash('sha256').update(key).digest('hex');
+  const db = { accounts: { [owner]: { bytes: 10 * 1024 * 1024, month: '', requests: 0 } }, bins: {} };
+  for (let i = 0; i < 103; i++) {
+    const bytes = i === 102 ? 40 * 1024 : 100 * 1024;
+    db.bins[i.toString(16).padStart(32, '0')] = { owner, visibility: 'private', value: 'x'.repeat(bytes - 2), bytes };
+  }
+  fs.writeFileSync(path.join(dir, 'storage.json'), JSON.stringify(db));
+  const server = createServer({ dataDir: dir });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise(resolve => server.close(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+    resolve();
+  })));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  assert.equal((await fetch(`${base}/api/bins`, options('POST', key, 1))).status, 413);
+  assert.equal((await fetch(`${base}/api/bins/${'0'.repeat(32)}`, options('DELETE', key))).status, 200);
+  assert.equal((await fetch(`${base}/api/bins`, options('POST', key, 'x'.repeat(100 * 1024 - 2)))).status, 201);
 });

@@ -141,6 +141,7 @@ function createServer({ dataDir = process.env.DATA_DIR || path.join(__dirname, '
         return send(res, 200, { deleted: true });
       }
       let value = parse(await body(req));
+      if (db.bins[match[1]] !== bin) fail(404, 'Not found');
       if (req.method === 'PATCH') {
         if (!value || Array.isArray(value) || typeof value !== 'object' ||
             !bin.value || Array.isArray(bin.value) || typeof bin.value !== 'object') {
