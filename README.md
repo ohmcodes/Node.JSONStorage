@@ -2,6 +2,8 @@
 
 A self-hosted JSON bin service built with Node.js. The server exposes an HTTP API, serves the browser client, and persists each bin as an individual JSON file.
 
+DEMO [https://jsonstorage.ohmcodes.com/](https://jsonstorage.ohmcodes.com/)
+
 ## Requirements
 
 - Node.js 18 or newer
