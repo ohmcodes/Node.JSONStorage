@@ -7,8 +7,10 @@ This document summarizes the browser application and HTTP service features. See 
 - Paste JSON or upload a `.json` file (up to 1 MiB).
 - Validate JSON and display the failing line and column.
 - Format, compact, repair, and download JSON.
+- Repair common syntax errors including trailing or missing commas, single quotes, unquoted keys, comments, and some truncated JSON; review repaired content before saving.
 - Keep an editor draft in the current tab and restore it after a refresh; show a browser leave-page warning for unsaved text.
 - Choose a light or dark theme; dark is the default and the selected theme is remembered in the browser.
+- Display the server-wide number of stored public and private bins without exposing their IDs or contents; refresh after local creation or deletion, on focus, and every minute.
 
 ## Save and Manage Bins
 
@@ -18,6 +20,7 @@ This document summarizes the browser application and HTTP service features. See 
 - Automatically generate an owner key when saving a Private bin if no key exists; pause bin creation until the Copy button is used, then save on the next press.
 - Keep saved bin IDs and visibility in browser `localStorage`; never store secret keys there.
 - Browse saved bins, load one into the editor with Use, or request deletion with Delete.
+- Load an existing bin by its ID; private bins also require their owner key. Loading a public bin does not grant write access.
 - Mask the current bin ID by default with reveal and copy controls.
 - Allow keyless Public creation and same-browser management through an HttpOnly owner cookie. Private reads and cross-client mutations require the owner key; a bin ID alone never authorizes deletion.
 
@@ -25,7 +28,7 @@ This document summarizes the browser application and HTTP service features. See 
 
 - Generate an account key and copy it to a password manager.
 - Keep the key masked by default, with reveal and copy controls.
-- Show Authentication controls inline only while Private visibility is selected; keep them hidden for Public.
+- Show Authentication controls inline for private reads and owner-key management of public or private bins.
 - Do not persist the key in local or session storage. A lost key cannot be recovered.
 
 ## API CRUD Tester

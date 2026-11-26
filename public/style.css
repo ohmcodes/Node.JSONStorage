@@ -42,7 +42,9 @@ main { max-width: 1050px; margin: auto; padding: 1.5rem; }
 .theme-control select { min-height: 2.6rem; color: var(--text); }
 h1, h2 { margin-bottom: .4rem; }
 p { color: var(--muted); line-height: 1.5; }
+.bin-count { margin: -.25rem 0 1rem; color: var(--focus); font-size: .9rem; font-weight: 600; }
 .toolbar, .field, .request-row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin: .8rem 0; }
+.repair-hint { margin: -.25rem 0 .8rem; font-size: .9rem; }
 .toolbar label { max-width: 100%; }
 button, input, select { font: inherit; padding: .55rem .7rem; }
 button, input, select, textarea { color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: .5rem; }
@@ -77,8 +79,8 @@ textarea::placeholder { color: var(--muted); opacity: 1; }
 #api-body { min-height: 10rem; max-height: 28rem; }
 #api-url { flex: 1; min-width: min(18rem, 100%); font-family: monospace; }
 .request-options { margin-top: .9rem; padding-top: .8rem; border-top: 1px solid var(--border); }
-.auth-controls { margin-top: .9rem; padding-top: .8rem; border-top: 1px solid var(--border); }
-.auth-controls h3 { margin-top: 0; }
+.auth-controls, .load-bin-controls { margin-top: .9rem; padding-top: .8rem; border-top: 1px solid var(--border); }
+.auth-controls h3, .load-bin-controls h3 { margin-top: 0; }
 .request-options p, .request-hint { margin: .6rem 0; }
 .page-links { display: flex; flex-wrap: wrap; gap: 1rem; margin: -.25rem 0 .75rem; }
 .guide-section { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border); }

@@ -1,6 +1,7 @@
 import { $, keyFieldError, keyNotice, message, parsed, showGeneratedKey, showSavedBinId, state, storeEditorDraft, ui } from './core.js';
 import { apiTarget, headers, request, sendApiRequest } from './api.js';
 import { forgetSavedBin, getSavedBin, rememberSavedBin } from './bins.js';
+import { refreshBinCount } from './bin-count.js';
 
 export function validateJson() {
   parsed();
@@ -82,6 +83,7 @@ export async function sendTestRequest() {
   const value = await sendApiRequest(method, target.pathname + target.search,
     ['POST', 'PUT', 'PATCH'].includes(method) ? $('api-body').value : undefined,
     ui.apiKeyHeader.value.trim() || ui.key.value.trim());
+  if ((method === 'POST' && target.pathname === '/api/bins') || method === 'DELETE') refreshBinCount();
   if (method === 'POST' && target.pathname === '/api/bins' && value.id) {
     state.currentSavedBinId = value.id;
     showSavedBinId(value.id);
@@ -126,6 +128,7 @@ export async function saveBin() {
     ? `/api/bins/${savedBinId}?visibility=${visibility}`
     : `/api/bins?visibility=${visibility}`;
   const value = await sendApiRequest(method, target, JSON.stringify(parsedValue));
+  if (method === 'POST') refreshBinCount();
   storeEditorDraft(true);
   const id = method === 'POST' ? value.id : savedBinId;
   const persisted = rememberSavedBin(id, method === 'POST' ? value.visibility : visibility);

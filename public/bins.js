@@ -1,6 +1,7 @@
-import { $, keyFieldError, message, selectPrivateVisibility, showSavedBinId, state, storeEditorDraft, ui } from './core.js';
+import { $, hasUnsavedEditorContent, keyFieldError, keyNotice, message, showSavedBinId, state, storeEditorDraft, ui } from './core.js';
 import { headers, sendApiRequest, request } from './api.js';
 import { reconcileEntries } from './bin-sync.js';
+import { refreshBinCount } from './bin-count.js';
 
 const savedBinsStorageKey = 'jsonstorage.savedBins';
 let savedBins = loadSavedBins();
@@ -89,6 +90,7 @@ export async function reconcileSavedBins() {
     if (response.status === 404) return { missing: true };
     return { visibility: response.headers.get('X-Bin-Visibility') };
   });
+  if (JSON.stringify(savedBins) !== JSON.stringify(snapshot)) return;
   const previous = JSON.stringify(savedBins);
   savedBins = entries;
   if (JSON.stringify(savedBins) === previous) return;
@@ -102,21 +104,38 @@ export async function reconcileSavedBins() {
   }
 }
 
-export async function useSavedBin(entry) {
-  if (entry.visibility === 'private' && !ui.key.value.trim()) {
-    selectPrivateVisibility();
-    throw keyFieldError('This private bin needs its owner key. Enter it in Authentication, then choose Use again.');
+export async function loadBinById() {
+  const id = $('load-bin-id').value.trim();
+  if (!/^[a-f0-9]{32}$/.test(id)) throw new Error('Enter a valid 32-character bin ID.');
+  const response = await fetch(`/api/bins/${id}`, { method: 'HEAD', cache: 'no-store' });
+  if (response.status === 404) throw new Error('Bin not found. Check the ID or the bin may have expired.');
+  const visibility = response.headers.get('X-Bin-Visibility');
+  if (!((response.ok && ['public', 'private'].includes(visibility)) || (response.status === 401 && visibility === 'private'))) {
+    throw new Error(`Could not check bin visibility (${response.status}).`);
   }
+  await useSavedBin({ id, visibility }, { remember: true });
+}
+
+export async function useSavedBin(entry, { remember = false } = {}) {
+  if (entry.visibility === 'private' && !ui.key.value.trim()) {
+    throw keyFieldError('This private bin needs its owner key. Enter it in Authentication, then load the bin again.');
+  }
+  if (hasUnsavedEditorContent() && !confirm('Loading a bin will replace your unsaved editor content. Continue?')) return;
   let value;
   try {
-    value = await request(`/api/bins/${entry.id}`, { headers: headers() });
+    value = await request(`/api/bins/${entry.id}`, { headers: headers(entry.visibility === 'private' ? ui.key.value.trim() : '') });
   } catch (error) {
     if (error.status === 404) {
-      forgetExpiredBin(entry);
+      if (getSavedBin(entry.id)) forgetExpiredBin(entry);
+      else message('Bin not found. Check the ID or the bin may have expired.', 'error', 'storage');
       return;
+    }
+    if (error.status === 401) {
+      throw keyFieldError('A valid owner key is required. Enter it in Authentication, then load the bin again.');
     }
     throw error;
   }
+  keyNotice('');
   ui.editor.value = JSON.stringify(value, null, 2);
   storeEditorDraft(true);
   state.currentSavedBinId = entry.id;
@@ -124,16 +143,20 @@ export async function useSavedBin(entry) {
   ui.apiMethod.value = 'GET';
   ui.apiUrl.value = `/api/bins/${entry.id}`;
   $('api-panel').open = true;
-  document.querySelector(`input[name="visibility"][value="${entry.visibility}"]`).checked = true;
+  const visibilityOption = document.querySelector(`input[name="visibility"][value="${entry.visibility}"]`);
+  visibilityOption.checked = true;
+  visibilityOption.dispatchEvent(new Event('change'));
   $('storage-panel').open = true;
   ui.editor.scrollIntoView({ behavior: 'smooth', block: 'center' });
   ui.editor.focus();
-  message(`${entry.visibility === 'private' ? 'Private' : 'Public'} bin loaded into the editor`, 'success', 'storage');
+  const persisted = !remember || rememberSavedBin(entry.id, entry.visibility);
+  message(persisted
+    ? `${entry.visibility === 'private' ? 'Private' : 'Public'} bin loaded into the editor`
+    : 'Bin loaded, but browser storage is unavailable; keep a copy of its ID.', persisted ? 'success' : 'error', 'storage');
 }
 
 export async function deleteSavedBin(entry) {
   if (entry.visibility === 'private' && !ui.key.value.trim()) {
-    selectPrivateVisibility();
     throw keyFieldError('Enter the owner key in Authentication to delete this private bin.');
   }
   if (!confirm(`Delete this ${entry.visibility} bin ending ${entry.id.slice(-6)}? This cannot be undone.`)) return;
@@ -147,6 +170,7 @@ export async function deleteSavedBin(entry) {
     throw error;
   }
   const persisted = forgetSavedBin(entry.id);
+  refreshBinCount();
   if (state.currentSavedBinId === entry.id) {
     state.currentSavedBinId = '';
     $('saved-bin-field').hidden = true;

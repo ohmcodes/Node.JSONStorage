@@ -78,7 +78,7 @@ export function keyFieldError(text) {
 }
 
 export function revealAuthPanel() {
-  if (privateVisibilitySelected()) $('auth-panel').hidden = false;
+  $('auth-panel').hidden = false;
 }
 
 export function privateVisibilitySelected() {

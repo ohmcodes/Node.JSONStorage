@@ -138,7 +138,7 @@ function createServer({
 
   function recordActivity(req, status, value) {
     const pathname = new URL(req.url, 'http://localhost').pathname;
-    if (!pathname.startsWith('/api/') || pathname === '/api/live-logs') return;
+    if (!pathname.startsWith('/api/') || pathname === '/api/live-logs' || pathname === '/api/bin-count') return;
     const binMatch = /^\/api\/bins\/([a-f0-9]{32})(?:\/query)?$/.exec(pathname);
     const responseBinId = value && typeof value.id === 'string' && /^[a-f0-9]{32}$/.test(value.id)
       ? value.id
@@ -361,6 +361,12 @@ function createServer({
             paypal: process.env.PAYPAL_DONATE_URL || ''
           }
         });
+      }
+
+      if (req.method === 'GET' && url.pathname === '/api/bin-count') {
+        const count = fs.readdirSync(binsDir, { withFileTypes: true })
+          .filter(entry => entry.isFile() && /^[a-f0-9]{32}\.json$/.test(entry.name)).length;
+        return send(req, res, 200, { count });
       }
 
       if (req.method === 'GET' && url.pathname === '/api/live-logs') {

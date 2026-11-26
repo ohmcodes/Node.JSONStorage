@@ -92,6 +92,22 @@ test('HEAD checks saved-bin state without reading or extending bin usage', async
   assert.equal(privateHead.headers.get('x-bin-visibility'), 'private');
 });
 
+test('bin count includes stored public and private bins and reflects deletions', async t => {
+  const { request, key, dir, base } = await setup(t);
+  assert.deepEqual((await request('/api/bin-count')).body, { count: 0 });
+  const publicBin = await request('/api/bins?visibility=public', options('POST', key, { public: true }));
+  const privateBin = await request('/api/bins?visibility=private', options('POST', key, { private: true }));
+  fs.writeFileSync(path.join(dir, 'bins', 'not-a-bin.json'), '{}');
+  const response = await fetch(`${base}/api/bin-count`);
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('cache-control'), /no-store/);
+  assert.deepEqual(await response.json(), { count: 2 });
+  await request(`/api/bins/${publicBin.body.id}`, options('DELETE', key));
+  assert.deepEqual((await request('/api/bin-count')).body, { count: 1 });
+  await request(`/api/bins/${privateBin.body.id}`, options('DELETE', key));
+  assert.deepEqual((await request('/api/bin-count')).body, { count: 0 });
+});
+
 test('public app config returns only donation URL settings', async t => {
   const { request } = await setup(t);
   const response = await request('/api/config');
@@ -182,7 +198,7 @@ test('nested lookups filter arrays and select matching values', async t => {
 
 test('serves browser ES modules as JavaScript', async t => {
   const { base } = await setup(t);
-  const modules = ['app.js', 'core.js', 'api.js', 'bins.js', 'bin-sync.js', 'live-logs.js', 'actions.js', 'events.js', 'donations.js', 'theme.js', 'draft.js'];
+  const modules = ['app.js', 'core.js', 'api.js', 'bins.js', 'bin-sync.js', 'bin-count.js', 'live-logs.js', 'actions.js', 'events.js', 'donations.js', 'theme.js', 'draft.js'];
   for (const moduleName of modules) {
     const response = await fetch(`${base}/${moduleName}`);
     assert.equal(response.status, 200, moduleName);
@@ -210,6 +226,26 @@ test('validates input, size limits and repairs JSON', async t => {
   const repaired = await request('/api/repair', { method: 'POST', body: "{foo: 'bar',}" });
   assert.deepEqual(JSON.parse(repaired.body.json), { foo: 'bar' });
   assert.equal((await request('/api/repair', { method: 'POST', body: '' })).status, 400);
+});
+
+test('repairs common JSON syntax errors through the repair endpoint', async t => {
+  const { request } = await setup(t);
+  const cases = [
+    ['trailing comma', '{"a": 1,}', { a: 1 }],
+    ['single quotes', "{'a': 1}", { a: 1 }],
+    ['unquoted key', '{a: 1}', { a: 1 }],
+    ['missing comma', '{"a": 1 "b": 2}', { a: 1, b: 2 }],
+    ['comment', '{"a": 1} // note', { a: 1 }],
+    ['truncated JSON', '{"a": [1, 2', { a: [1, 2] }]
+  ];
+  for (const [name, input, expected] of cases) {
+    const response = await request('/api/repair', { method: 'POST', body: input });
+    assert.equal(response.status, 200, name);
+    assert.equal(response.body.json, JSON.stringify(expected, null, 2), name);
+  }
+  const invalid = await request('/api/repair', { method: 'POST', body: '' });
+  assert.equal(invalid.status, 400);
+  assert.deepEqual(invalid.body, { error: 'Unable to repair JSON' });
 });
 
 test('keyless Public bins use an HttpOnly owner cookie for mutations', async t => {

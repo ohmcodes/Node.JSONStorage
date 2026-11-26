@@ -10,8 +10,13 @@ DEMO [https://jsonstorage.ohmcodes.com/](https://jsonstorage.ohmcodes.com/)
 - **Bin storage:** Save public or private bins and manage saved bins from the browser.
 - **API tools:** Send requests with the CRUD tester and view sanitized live API logs.
 - **Appearance:** Choose between dark and light themes.
+- **Server count:** See the number of currently stored public and private bins.
 
 See the [feature index](FEATURES.md) for the full list and service limits.
+
+The editor's Repair JSON action can fix common errors such as trailing or missing commas, single quotes, unquoted keys, comments, and some truncated JSON. Repair is best-effort: review the result before saving, particularly when content was truncated.
+
+To load an existing bin, open **Save and Manage Bins**, enter its ID under **Load a bin by ID**, and select **Load bin**. Private bins also require the owner key in **Authentication**. A successfully loaded bin becomes the current bin and is added to the browser's saved list when storage is available. Public bins can be read with only their ID, but updating or deleting them still requires the owner key or, for keyless bins, the creating browser's owner cookie.
 
 ### JSON editor and themes
 
@@ -129,6 +134,7 @@ Never include the key in the URL or query string. A public `GET` request does no
 | Method | Path | Behavior |
 | --- | --- | --- |
 | POST | `/api/accounts` | Create an account and return its owner key once. |
+| GET | `/api/bin-count` | Return the total number of currently stored public and private bins as `{ "count": number }`. |
 | POST | `/api/bins?visibility=public` | Create a public bin. An owner key is optional; without one the server issues a same-browser management cookie. |
 | POST | `/api/bins?visibility=private` | Create a private bin from the request body. |
 | POST | `/api/bins/:id/query` | Filter nested arrays and select matching values. Public bins can be queried without a key; private bins require the owner key. |
@@ -141,6 +147,8 @@ Never include the key in the URL or query string. A public `GET` request does no
 | GET | `/api/live-logs` | Public Server-Sent Events stream for the live log panel. |
 
 Private reads and cross-client writes/deletes require the owning key in `X-Secret-Key`. Keyless Public bins use a random HttpOnly, `SameSite=Strict` cookie on the creating browser for updates/deletes. A visibility change on `PUT` requires authorization for the current bin; making it Private also requires a valid destination owner key. The bin ID alone never authorizes a change or deletion. Never put a key in a URL.
+
+The public bin count includes both public and private bins, but exposes no IDs or contents. It reflects bins currently stored on disk, including inactive bins until the server's cleanup removes them. The browser refreshes it after creating or deleting bins, when the window regains focus, and every minute.
 
 Example using curl (replace `YOUR_KEY` and `BIN_ID`):
 

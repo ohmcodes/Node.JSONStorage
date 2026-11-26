@@ -25,6 +25,7 @@
       </nav>
     </header>
     <p>Paste or upload JSON, edit it, and save it as a public or private bin.</p>
+    <p id="bin-count" class="bin-count" role="status" aria-live="polite">Current bins on server: loading...</p>
     <nav class="page-links" aria-label="Page guides">
       <a href="#guide">How to use and endpoint guide</a>
       <a href="https://github.com/ohmcodes/Node.JSONStorage#readme" target="_blank" rel="noopener noreferrer">Read README</a>
@@ -43,6 +44,7 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4"/></svg>
       </button>
     </div>
+    <p class="repair-hint">Repair can fix trailing or missing commas, single quotes, unquoted keys, comments, and some truncated JSON. Review the result before saving.</p>
     <label for="editor">JSON editor</label>
     <textarea id="editor" spellcheck="false" placeholder='{"hello": "world"}'></textarea>
     <p id="status" role="status" aria-live="polite"></p>
@@ -54,7 +56,7 @@
         <label><input type="radio" name="visibility" value="public" checked> Public</label>
         <label><input type="radio" name="visibility" value="private"> Private</label>
       </fieldset>
-      <p id="visibility-note" class="request-hint">Public bins can be read without a key. Changing visibility and saving updates the selected bin; making a keyless Public bin private requires a new owner key.</p>
+      <p id="visibility-note" class="request-hint">Public bins can be read without a key. Keyless bins use this browser’s owner cookie for updates and deletes; account-owned bins require their owner key. Making a keyless Public bin private requires a valid owner key.</p>
       <p class="request-hint">Bins are automatically deleted after 30 days without a successful GET, PUT, or PATCH. Reading or updating a bin resets its inactivity timer.</p>
       <div class="field">
         <button id="save-bin" type="button">
@@ -64,7 +66,16 @@
         <button id="new-bin" type="button">New bin</button>
       </div>
       <p id="storage-status" class="area-status" role="status" aria-live="polite"></p>
-      <div id="auth-panel" class="auth-controls" hidden>
+      <div class="load-bin-controls">
+        <h3>Load a bin by ID</h3>
+        <p>Enter a saved bin ID to load it into the editor. Private bins also require their owner key below. Reading a public bin does not grant permission to update or delete it.</p>
+        <div class="field">
+          <label for="load-bin-id">Bin ID</label>
+          <input id="load-bin-id" type="text" autocomplete="off" spellcheck="false" placeholder="32-character bin ID">
+          <button id="load-bin" type="button">Load bin</button>
+        </div>
+      </div>
+      <div id="auth-panel" class="auth-controls">
         <h3>Authentication</h3>
         <p>Private bins require the owning key for reads. Public bins saved without a key use this browser's HttpOnly owner cookie for updates and deletes. To manage public bins from another client, create them with an account key.</p>
         <div class="field">
@@ -157,7 +168,7 @@
       <ol>
         <li>Paste or upload JSON. Save bin validates it and formats it before sending.</li>
         <li>Choose Public or Private in Save and Manage Bins, then save. Changing visibility updates the selected bin. If Private has no key, Save generates one and pauses; copy it with the Copy button, then press Save bin again to create or update the bin.</li>
-        <li>Your bin is saved on the server. The saved-bin list on this browser keeps only its ID and visibility, and refreshes when the page opens or returns to focus. Missing bins are removed and visibility is updated from the server. Use loads a bin into the editor; Delete removes it from the server and this browser's list.</li>
+        <li>Your bin is saved on the server. To load one by ID, enter the ID under Load a bin by ID; for a private bin, also enter its owner key in Authentication. The saved-bin list on this browser keeps only IDs and visibility, and refreshes when the page opens or returns to focus. Use loads a bin into the editor; Delete removes it from the server and this browser's list.</li>
         <li>The secret key is never stored in the browser. Public reads need only the ID; keyless public bins are managed by this browser's HttpOnly cookie. Private bins require the owner key.</li>
         <li>Bins expire after 30 days without a successful GET, PUT, or PATCH. Any of those operations resets the inactivity timer.</li>
         <li>Use the API CRUD Tester for manual requests; its Results section appears in the same panel. Paste either a bin ID or an API path.</li>

@@ -1,9 +1,10 @@
 import { $, hasUnsavedEditorContent, message, state, storeEditorDraft, ui } from './core.js';
 import * as actions from './actions.js';
-import { deleteSavedBin, getSavedBin, getSavedBins, reconcileSavedBins, renderSavedBins, useSavedBin } from './bins.js';
+import { deleteSavedBin, getSavedBin, getSavedBins, loadBinById, reconcileSavedBins, renderSavedBins, useSavedBin } from './bins.js';
 import { clearLiveLogs, connectLiveLogs, renderLiveLogs, stopLiveLogs } from './live-logs.js';
 import { configureDonationLinks } from './donations.js';
 import { initializeTheme } from './theme.js';
+import { refreshBinCount } from './bin-count.js';
 
 function bindAction(id, callback, area = 'editor') {
   $(id).addEventListener('click', async () => {
@@ -21,8 +22,7 @@ function bindVisibilityEvents() {
       const isPrivate = document.querySelector('input[name="visibility"]:checked').value === 'private';
       $('visibility-note').textContent = isPrivate
         ? 'Private bins require the owner key to save, read, edit, and delete. Enter or generate the key in Authentication.'
-        : 'Public bins can be created and read without entering a key. This browser receives an HttpOnly owner cookie for updates and deletes; other clients need the owner key.';
-      $('auth-panel').hidden = !isPrivate;
+        : 'Public bins can be read without a key. Keyless bins use this browser’s owner cookie for updates and deletes; account-owned bins require their owner key.';
       if (isPrivate) $('storage-panel').open = true;
     });
   });
@@ -124,6 +124,7 @@ function bindActions() {
   bindAction('toggle-bin-id', actions.toggleBinId, 'storage');
   bindAction('send-request', actions.sendTestRequest, 'api');
   bindAction('save-bin', actions.saveBin, 'storage');
+  bindAction('load-bin', loadBinById, 'storage');
   $('new-bin').addEventListener('click', () => {
     state.currentSavedBinId = '';
     $('saved-bin-field').hidden = true;
@@ -159,5 +160,8 @@ export function initializeApp() {
   renderSavedBins();
   reconcileSavedBins();
   window.addEventListener('focus', reconcileSavedBins);
+  refreshBinCount();
+  window.addEventListener('focus', refreshBinCount);
+  window.setInterval(refreshBinCount, 60000);
   configureDonationLinks();
 }
