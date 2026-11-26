@@ -346,9 +346,9 @@ function createServer({
     res.setHeader('Content-Security-Policy', "default-src 'self'; style-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'");
     try {
       const url = new URL(req.url, 'http://localhost');
-      if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/style.css' || /^\/[a-z][a-z0-9-]*\.js$/.test(url.pathname))) {
+      if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/style.css' || url.pathname === '/icon.svg' || /^\/[a-z][a-z0-9-]*\.js$/.test(url.pathname))) {
         const name = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
-        const type = name.endsWith('.html') ? 'text/html' : name.endsWith('.js') ? 'text/javascript' : 'text/css';
+        const type = name.endsWith('.html') ? 'text/html' : name.endsWith('.js') ? 'text/javascript' : name.endsWith('.svg') ? 'image/svg+xml' : 'text/css';
         res.writeHead(200, { 'Content-Type': `${type}; charset=utf-8`, 'Cache-Control': 'no-store' });
         return res.end(fs.readFileSync(path.join(__dirname, 'public', name)));
       }

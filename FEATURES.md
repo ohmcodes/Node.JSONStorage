@@ -8,7 +8,7 @@ This document summarizes the browser application and HTTP service features. See 
 - Validate JSON and display the failing line and column.
 - Format, compact, repair, and download JSON.
 - Keep an editor draft in the current tab and restore it after a refresh; show a browser leave-page warning for unsaved text.
-- Follow the operating system's light/dark theme or choose a theme manually.
+- Choose a light or dark theme; dark is the default and the selected theme is remembered in the browser.
 
 ## Save and Manage Bins
 

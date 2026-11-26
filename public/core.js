@@ -10,7 +10,6 @@ export const ui = {
   apiUrl: $('api-url'),
   apiKeyHeader: $('api-key-header'),
   responseOutput: $('response'),
-  themeToggle: $('theme-toggle')
 };
 
 export const state = {

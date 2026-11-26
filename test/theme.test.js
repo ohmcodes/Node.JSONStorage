@@ -13,52 +13,50 @@ async function binSyncModule() {
   return import('../public/bin-sync.js');
 }
 
-function themePage({ dark = false, stored = null, storageBlocked = false } = {}) {
-  let onSystemChange;
-  const attributes = {};
-  const toggle = {
-    addEventListener(event, callback) { this.onClick = callback; },
-    setAttribute(name, value) { attributes[name] = value; },
-    getAttribute(name) { return attributes[name]; }
+function themePage({ stored = null, storageBlocked = false } = {}) {
+  const select = {
+    value: '',
+    addEventListener(event, callback) { this.onChange = callback; }
   };
-  const document = { documentElement: { dataset: {} }, getElementById: () => toggle };
-  const systemTheme = {
-    matches: dark,
-    addEventListener(event, callback) { onSystemChange = callback; }
-  };
+  const document = { documentElement: { dataset: {} }, getElementById: () => select };
   const values = new Map(stored === null ? [] : [['theme', stored]]);
   const storage = {
     getItem(name) { if (storageBlocked) throw new Error('blocked'); return values.get(name) || null; },
     setItem(name, value) { if (storageBlocked) throw new Error('blocked'); values.set(name, value); }
   };
-  const window = { matchMedia: () => systemTheme };
-  return { document, toggle, systemTheme, storage, window, attributes, onSystemChange: () => onSystemChange };
+  return { document, select, storage };
 }
 
-test('follows system theme until the user chooses a theme', async () => {
+test('defaults to dark and persists both theme selections', async () => {
   const { initializeTheme } = await themeModule();
   const page = themePage();
   initializeTheme(page);
-  assert.equal(page.attributes['aria-pressed'], 'false');
-  page.systemTheme.matches = true;
-  page.onSystemChange()();
-  assert.equal(page.attributes['aria-pressed'], 'true');
-  page.toggle.onClick();
+  assert.equal(page.document.documentElement.dataset.theme, 'dark');
+  assert.equal(page.select.value, 'dark');
+  page.select.value = 'light';
+  page.select.onChange();
   assert.equal(page.document.documentElement.dataset.theme, 'light');
   assert.equal(page.storage.getItem('theme'), 'light');
+  page.select.value = 'dark';
+  page.select.onChange();
+  assert.equal(page.document.documentElement.dataset.theme, 'dark');
+  assert.equal(page.storage.getItem('theme'), 'dark');
 });
 
 test('restores a saved theme and tolerates blocked storage', async () => {
   const { initializeTheme } = await themeModule();
-  const restored = themePage({ stored: 'dark' });
+  const restored = themePage({ stored: 'light' });
   initializeTheme(restored);
-  assert.equal(restored.document.documentElement.dataset.theme, 'dark');
-  assert.equal(restored.attributes['aria-pressed'], 'true');
+  assert.equal(restored.document.documentElement.dataset.theme, 'light');
+  assert.equal(restored.select.value, 'light');
+  const invalid = themePage({ stored: 'invalid' });
+  initializeTheme(invalid);
+  assert.equal(invalid.select.value, 'dark');
   const blocked = themePage({ storageBlocked: true });
   initializeTheme(blocked);
-  blocked.toggle.onClick();
-  assert.equal(blocked.document.documentElement.dataset.theme, 'dark');
-  assert.equal(blocked.attributes['aria-pressed'], 'true');
+  blocked.select.value = 'light';
+  blocked.select.onChange();
+  assert.equal(blocked.document.documentElement.dataset.theme, 'light');
 });
 
 test('stores and restores a draft in the same tab', async () => {

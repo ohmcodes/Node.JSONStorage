@@ -4,6 +4,37 @@ A self-hosted JSON bin service built with Node.js. The server exposes an HTTP AP
 
 DEMO [https://jsonstorage.ohmcodes.com/](https://jsonstorage.ohmcodes.com/)
 
+## Features and Screenshots
+
+- **JSON editor:** Upload, validate, format, compact, repair, and download JSON. Drafts are kept in the current tab.
+- **Bin storage:** Save public or private bins and manage saved bins from the browser.
+- **API tools:** Send requests with the CRUD tester and view sanitized live API logs.
+- **Appearance:** Choose between dark and light themes.
+
+See the [feature index](FEATURES.md) for the full list and service limits.
+
+### JSON editor and themes
+
+Dark theme (default):
+
+![JSON editor with a sample document in the dark theme](docs/screenshots/editor-dark.png)
+
+Light theme:
+
+![JSON editor with a sample document in the light theme](docs/screenshots/editor-light.png)
+
+### Save and manage bins
+
+![Bin management panel showing a saved public bin](docs/screenshots/manage-bins.png)
+
+### API CRUD tester
+
+![API tester showing a successful GET response](docs/screenshots/api-tester.png)
+
+### Live API logs
+
+![Live API log viewer showing sample requests](docs/screenshots/live-logs.png)
+
 ## Requirements
 
 - Node.js 18 or newer
@@ -35,6 +66,8 @@ npm start
 `PORT`, `HOST`, and `DATA_DIR` can also be set in the process environment before running `npm start`; process environment variables override `.env`. To remove an old PowerShell override and use `.env`, run `Remove-Item Env:DATA_DIR -ErrorAction SilentlyContinue` in that terminal before starting the server. Use one server process per data directory. For deployment, use persistent storage and HTTPS; never send secret keys over unencrypted connections.
 
 The server loads `.env` at startup. `DATA_DIR=./data` stores account data in `data/accounts.json` and each bin in `data/bins/<bin-id>.json` when started from the repository directory. Donation destinations are configured with `PATREON_URL`, `BUY_ME_A_COFFEE_URL`, and `PAYPAL_DONATE_URL`; placeholder URLs remain disabled. Process environment values take precedence over `.env`.
+
+The browser interface defaults to a dark theme. Use the Theme selector to choose light or dark; the selection is remembered in browser storage when available. Donation links appear in both the header and footer and are enabled by the same settings.
 
 ## Docker
 

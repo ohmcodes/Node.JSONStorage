@@ -4,21 +4,24 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>JSON Storage</title>
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
   <link rel="stylesheet" href="/style.css">
   <script type="module" src="/app.js"></script>
 </head>
 <body>
+  <svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="icon-patreon" viewBox="0 0 24 24"><path d="M4 3h3v18H4zM14.5 3a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13Z"/></symbol>
+    <symbol id="icon-coffee" viewBox="0 0 24 24"><path d="M4 8h13v6a6.5 6.5 0 0 1-13 0V8Zm13 1h2a2.5 2.5 0 0 1 0 5h-2M7 3v2m4-2v2m4-2v2M3 21h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="icon-paypal" viewBox="0 0 24 24"><path d="M7.5 3h7c3.4 0 5.2 1.7 4.7 4.7-.5 3.1-2.6 4.8-6 4.8h-2.1L9.8 19H5L7.5 3Zm4.7 10.8h1.7c2.4 0 4.3-.7 5.4-2.2.4.7.5 1.6.3 2.6-.5 2.8-2.4 4.2-5.3 4.2h-1.6l-.5 2.6H9.4l1.5-7.2h1.3Z"/></symbol>
+  </svg>
   <main>
     <header class="page-header">
-      <h1>JSON Storage</h1>
+      <div class="brand"><img src="/icon.svg" width="48" height="48" alt=""><div><span class="brand-kicker">Your data, in orbit</span><h1>JSON Storage</h1></div></div>
       <nav class="header-actions" aria-label="Support and appearance">
-        <a id="patreon-link" class="donation-link" aria-disabled="true" title="Set PATREON_URL in .env">Patreon</a>
-        <a id="coffee-link" class="donation-link" aria-disabled="true" title="Set BUY_ME_A_COFFEE_URL in .env">Buy me a coffee</a>
-        <a id="paypal-link" class="donation-link" aria-disabled="true" title="Set PAYPAL_DONATE_URL in .env">Donate with PayPal</a>
-        <button id="theme-toggle" class="icon-button" type="button" aria-label="Switch to dark mode" title="Switch to dark mode" aria-pressed="false" data-icon="moon">
-          <svg class="moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 15.5A8.5 8.5 0 0 1 8.5 3.5 8.5 8.5 0 1 0 20.5 15.5Z"/></svg>
-          <svg class="sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
-        </button>
+        <a class="donation-link" data-donation="patreon" aria-disabled="true" title="Set PATREON_URL in .env"><svg aria-hidden="true"><use href="#icon-patreon"></use></svg>Patreon</a>
+        <a class="donation-link" data-donation="buyMeACoffee" aria-disabled="true" title="Set BUY_ME_A_COFFEE_URL in .env"><svg aria-hidden="true"><use href="#icon-coffee"></use></svg>Buy me a coffee</a>
+        <a class="donation-link" data-donation="paypal" aria-disabled="true" title="Set PAYPAL_DONATE_URL in .env"><svg aria-hidden="true"><use href="#icon-paypal"></use></svg>PayPal</a>
+        <label class="theme-control" for="theme-select">Theme <select id="theme-select"><option value="dark">Dark</option><option value="light">Light</option></select></label>
       </nav>
     </header>
     <p>Paste or upload JSON, edit it, and save it as a public or private bin.</p>
@@ -209,7 +212,14 @@ Content-Type: application/json</code></pre>
       </details>
       <p>Public bins can be read by anyone. Keyless public bins can be changed or deleted only by the browser holding their HttpOnly owner cookie; private bins and other clients require the owner key. PUT replaces the full value; PATCH shallow-merges object fields.</p>
     </section>
-    <footer class="site-footer"><a href="https://ohmcodes.com" target="_blank" rel="noopener noreferrer">ohmcodes.com</a> &copy; <span id="copyright-year">2026</span></footer>
+    <footer class="site-footer">
+      <div><a href="https://ohmcodes.com" target="_blank" rel="noopener noreferrer">ohmcodes.com</a> &copy; <span id="copyright-year">2026</span></div>
+      <nav class="footer-actions" aria-label="Support JSON Storage">
+        <a class="donation-link" data-donation="patreon" aria-disabled="true" title="Set PATREON_URL in .env"><svg aria-hidden="true"><use href="#icon-patreon"></use></svg>Patreon</a>
+        <a class="donation-link" data-donation="buyMeACoffee" aria-disabled="true" title="Set BUY_ME_A_COFFEE_URL in .env"><svg aria-hidden="true"><use href="#icon-coffee"></use></svg>Buy me a coffee</a>
+        <a class="donation-link" data-donation="paypal" aria-disabled="true" title="Set PAYPAL_DONATE_URL in .env"><svg aria-hidden="true"><use href="#icon-paypal"></use></svg>PayPal</a>
+      </nav>
+    </footer>
   </main>
 </body>
 </html>

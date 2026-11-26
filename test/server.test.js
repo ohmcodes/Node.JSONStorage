@@ -189,7 +189,16 @@ test('serves browser ES modules as JavaScript', async t => {
     assert.match(response.headers.get('content-type'), /text\/javascript/, moduleName);
   }
   const page = await fetch(`${base}/`);
-  assert.match(await page.text(), /<script type="module" src="\/app\.js"><\/script>/);
+  const html = await page.text();
+  assert.match(html, /<script type="module" src="\/app\.js"><\/script>/);
+  assert.match(html, /<link rel="icon" type="image\/svg\+xml" href="\/icon\.svg">/);
+  for (const key of ['patreon', 'buyMeACoffee', 'paypal']) {
+    assert.equal((html.match(new RegExp(`data-donation="${key}"`, 'g')) || []).length, 2);
+  }
+  const icon = await fetch(`${base}/icon.svg`);
+  assert.equal(icon.status, 200);
+  assert.match(icon.headers.get('content-type'), /image\/svg\+xml/);
+  assert.match(await icon.text(), /<svg/);
 });
 
 test('validates input, size limits and repairs JSON', async t => {

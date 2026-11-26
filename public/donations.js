@@ -1,17 +1,10 @@
-const links = [
-  ['patreon-link', 'patreon'],
-  ['coffee-link', 'buyMeACoffee'],
-  ['paypal-link', 'paypal']
-];
-
 export async function configureDonationLinks() {
   try {
     const response = await fetch('/api/config', { cache: 'no-store' });
     if (!response.ok) return;
     const { donations = {} } = await response.json();
-    for (const [id, key] of links) {
-      const link = document.getElementById(id);
-      const value = donations[key];
+    for (const link of document.querySelectorAll('[data-donation]')) {
+      const value = donations[link.dataset.donation];
       if (typeof value !== 'string' || !value.trim() || /YOUR_|PLACEHOLDER/i.test(value)) continue;
       let url;
       try { url = new URL(value, window.location.origin); } catch { continue; }
