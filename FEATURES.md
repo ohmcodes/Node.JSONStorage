@@ -5,6 +5,7 @@ This document summarizes the browser application and HTTP service features. See 
 ## JSON Editor
 
 - Paste JSON or upload a `.json` file (up to 1 MiB).
+- Switch between raw JSON input and an editable table that navigates one object or array level at a time, with clickable path breadcrumbs; edit primitive values as JSON and add or remove properties and items at any level.
 - Validate JSON and display the failing line and column.
 - Format, compact, repair, and download JSON.
 - Repair common syntax errors including trailing or missing commas, single quotes, unquoted keys, comments, and some truncated JSON; review repaired content before saving.

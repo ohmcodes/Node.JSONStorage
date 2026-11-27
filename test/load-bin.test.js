@@ -10,7 +10,7 @@ test('load by ID checks visibility, authenticates private bins and preserves edi
     if (!elements.has(id)) elements.set(id, {
       value: '', textContent: '', dataset: {}, hidden: false,
       setAttribute() {}, replaceChildren() {}, append() {}, focus() {}, scrollIntoView() {},
-      dispatchEvent() {}
+      dispatchEvent() {}, addEventListener() {}
     });
 
     return elements.get(id);

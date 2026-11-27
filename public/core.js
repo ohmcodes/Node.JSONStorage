@@ -1,4 +1,5 @@
 import { createDraftController } from './draft.js';
+import { createTableEditor } from './table-editor.js';
 
 export const $ = id => document.getElementById(id);
 
@@ -25,6 +26,20 @@ const draftController = createDraftController({
   draftState: $('draft-state')
 });
 
+const tableEditor = createTableEditor({
+  editor: ui.editor,
+  rawView: $('raw-editor-view'),
+  tableView: $('table-editor-view'),
+  tableBody: $('table-editor-rows'),
+  breadcrumb: $('table-editor-breadcrumb'),
+  rawButton: $('editor-mode-raw'),
+  tableButton: $('editor-mode-table'),
+  addEntryButton: $('table-editor-add'),
+  errorElement: $('table-editor-error'),
+  onChange: () => draftController.store(),
+  onError: text => message(text, 'error')
+});
+
 export function showSavedBinId(binId) {
   if (!/^[a-f0-9]{32}$/.test(binId)) return;
   $('saved-bin-id').value = binId;
@@ -38,10 +53,11 @@ export function showSavedBinId(binId) {
 
 export function storeEditorDraft(saved = false) {
   draftController.store(saved);
+  tableEditor.refreshFromEditor();
 }
 
 export function hasUnsavedEditorContent() {
-  return draftController.hasUnsavedEditorContent();
+  return draftController.hasUnsavedEditorContent() || tableEditor.hasInvalidEdits();
 }
 
 export function message(text, status = 'success', area = 'editor') {
@@ -92,6 +108,7 @@ export function selectPrivateVisibility() {
 }
 
 export function parsed() {
+  tableEditor.syncToEditor();
   try {
     return JSON.parse(ui.editor.value);
   } catch (error) {

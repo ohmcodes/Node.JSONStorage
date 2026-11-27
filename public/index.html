@@ -45,8 +45,28 @@
       </button>
     </div>
     <p class="repair-hint">Repair can fix trailing or missing commas, single quotes, unquoted keys, comments, and some truncated JSON. Review the result before saving.</p>
-    <label for="editor">JSON editor</label>
-    <textarea id="editor" spellcheck="false" placeholder='{"hello": "world"}'></textarea>
+    <div class="editor-mode-control" role="group" aria-label="JSON editor mode">
+      <button id="editor-mode-raw" type="button" aria-pressed="true">Raw JSON</button>
+      <button id="editor-mode-table" type="button" aria-pressed="false">Table</button>
+    </div>
+    <div id="raw-editor-view">
+      <label for="editor">JSON editor</label>
+      <textarea id="editor" spellcheck="false" placeholder='{"hello": "world"}'></textarea>
+    </div>
+    <section id="table-editor-view" class="table-editor-view" aria-label="Editable JSON table" hidden>
+      <div class="table-editor-controls">
+        <p>Open objects and arrays to edit one level at a time. Properties and items can be added or removed.</p>
+        <button id="table-editor-add" type="button">Add property</button>
+      </div>
+      <nav id="table-editor-breadcrumb" class="table-editor-breadcrumbs" aria-label="JSON path"></nav>
+      <p id="table-editor-error" class="table-editor-error" role="alert" hidden></p>
+      <div class="table-editor-wrap">
+        <table class="table-editor">
+          <thead><tr><th>Property / index</th><th>JSON value</th><th>Actions</th></tr></thead>
+          <tbody id="table-editor-rows"></tbody>
+        </table>
+      </div>
+    </section>
     <p id="status" role="status" aria-live="polite"></p>
     <p id="draft-state" class="draft-state" role="status" aria-live="polite">Draft stays in this tab and can be restored after a refresh; closing the tab clears it.</p>
     <details id="storage-panel" class="storage-panel">
