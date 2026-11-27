@@ -1,6 +1,6 @@
 import { $, hasUnsavedEditorContent, message, state, storeEditorDraft, ui } from './core.js';
 import * as actions from './actions.js';
-import { deleteSavedBin, getSavedBin, getSavedBins, loadBinById, reconcileSavedBins, renderSavedBins, useSavedBin } from './bins.js';
+import { deleteSavedBin, getSavedBin, getSavedBins, loadBinById, reconcileSavedBins, reloadCurrentBin, renderSavedBins, useSavedBin } from './bins.js';
 import { clearLiveLogs, connectLiveLogs, renderLiveLogs, stopLiveLogs } from './live-logs.js';
 import { configureDonationLinks } from './donations.js';
 import { initializeTheme } from './theme.js';
@@ -112,6 +112,7 @@ function bindEditorEvents() {
 }
 
 function bindActions() {
+  bindAction('clear-json', actions.clearJson);
   bindAction('validate', actions.validateJson);
   bindAction('format', actions.formatJson);
   bindAction('compact', actions.compactJson);
@@ -125,6 +126,7 @@ function bindActions() {
   bindAction('send-request', actions.sendTestRequest, 'api');
   bindAction('save-bin', actions.saveBin, 'storage');
   bindAction('load-bin', loadBinById, 'storage');
+  bindAction('reload-bin', reloadCurrentBin, 'storage');
   $('new-bin').addEventListener('click', () => {
     state.currentSavedBinId = '';
     $('saved-bin-field').hidden = true;

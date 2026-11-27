@@ -5,7 +5,8 @@ This document summarizes the browser application and HTTP service features. See 
 ## JSON Editor
 
 - Paste JSON or upload a `.json` file (up to 1 MiB).
-- Switch between raw JSON input and an editable table that navigates one object or array level at a time, with clickable path breadcrumbs; edit primitive values as JSON and add or remove properties and items at any level.
+- Clear the editor after confirmation without deleting or deselecting the current bin.
+- Switch between raw JSON input and an editable table that navigates one object or array level at a time, with clickable path breadcrumbs; edit primitive values as JSON and add, remove, or reorder properties and items with dragging or Up/Down buttons. Integer-index object keys retain JavaScript's standard numeric ordering.
 - Validate JSON and display the failing line and column.
 - Format, compact, repair, and download JSON.
 - Repair common syntax errors including trailing or missing commas, single quotes, unquoted keys, comments, and some truncated JSON; review repaired content before saving.
@@ -19,9 +20,11 @@ This document summarizes the browser application and HTTP service features. See 
 - Validate and format editor content automatically before a Save request.
 - Create a new bin or update the last selected bin.
 - Automatically generate an owner key when saving a Private bin if no key exists; pause bin creation until the Copy button is used, then save on the next press.
+- Update an existing private bin without copying its key again; the owner key is still required.
 - Keep saved bin IDs and visibility in browser `localStorage`; never store secret keys there.
 - Browse saved bins, load one into the editor with Use, or request deletion with Delete.
 - Load an existing bin by its ID; private bins also require their owner key. Loading a public bin does not grant write access.
+- Reload the current bin on demand to fetch external updates, confirming before replacing unsaved edits; private bins require their owner key.
 - Mask the current bin ID by default with reveal and copy controls.
 - Allow keyless Public creation and same-browser management through an HttpOnly owner cookie. Private reads and cross-client mutations require the owner key; a bin ID alone never authorizes deletion.
 

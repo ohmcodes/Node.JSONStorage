@@ -107,23 +107,31 @@ export async function reconcileSavedBins() {
 export async function loadBinById() {
   const id = $('load-bin-id').value.trim();
   if (!/^[a-f0-9]{32}$/.test(id)) throw new Error('Enter a valid 32-character bin ID.');
+  await loadBin(id);
+}
+
+export async function reloadCurrentBin() {
+  if (!state.currentSavedBinId) throw new Error('Load or save a bin before reloading.');
+  await loadBin(state.currentSavedBinId, true);
+}
+
+async function loadBin(id, requireCurrent = false) {
   const response = await fetch(`/api/bins/${id}`, { method: 'HEAD', cache: 'no-store' });
   if (response.status === 404) throw new Error('Bin not found. Check the ID or the bin may have expired.');
   const visibility = response.headers.get('X-Bin-Visibility');
   if (!((response.ok && ['public', 'private'].includes(visibility)) || (response.status === 401 && visibility === 'private'))) {
     throw new Error(`Could not check bin visibility (${response.status}).`);
   }
-  await useSavedBin({ id, visibility }, { remember: true });
+  await useSavedBin({ id, visibility }, { remember: true, requireCurrent });
 }
 
-export async function useSavedBin(entry, { remember = false } = {}) {
+export async function useSavedBin(entry, { remember = false, requireCurrent = false } = {}) {
   if (entry.visibility === 'private' && !ui.key.value.trim()) {
     throw keyFieldError('This private bin needs its owner key. Enter it in Authentication, then load the bin again.');
   }
-  if (hasUnsavedEditorContent() && !confirm('Loading a bin will replace your unsaved editor content. Continue?')) return;
   let value;
   try {
-    value = await request(`/api/bins/${entry.id}`, { headers: headers(entry.visibility === 'private' ? ui.key.value.trim() : '') });
+    value = await request(`/api/bins/${entry.id}`, { cache: 'no-store', headers: headers(entry.visibility === 'private' ? ui.key.value.trim() : '') });
   } catch (error) {
     if (error.status === 404) {
       if (getSavedBin(entry.id)) forgetExpiredBin(entry);
@@ -135,9 +143,13 @@ export async function useSavedBin(entry, { remember = false } = {}) {
     }
     throw error;
   }
+  if (requireCurrent && state.currentSavedBinId !== entry.id) {
+    throw new Error('The current bin changed while reloading. Reload the selected bin again.');
+  }
+  if (hasUnsavedEditorContent() && !confirm('Loading a bin will replace your unsaved editor content. Continue?')) return;
   keyNotice('');
   ui.editor.value = JSON.stringify(value, null, 2);
-  storeEditorDraft(true);
+  storeEditorDraft(true, true);
   state.currentSavedBinId = entry.id;
   showSavedBinId(entry.id);
   ui.apiMethod.value = 'GET';

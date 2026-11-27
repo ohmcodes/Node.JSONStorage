@@ -1,7 +1,14 @@
-import { $, keyFieldError, keyNotice, message, parsed, showGeneratedKey, showSavedBinId, state, storeEditorDraft, ui } from './core.js';
+import { $, clearEditor, hasUnsavedEditorContent, keyFieldError, keyNotice, message, parsed, showGeneratedKey, showSavedBinId, state, storeEditorDraft, ui } from './core.js';
 import { apiTarget, headers, request, sendApiRequest } from './api.js';
 import { forgetSavedBin, getSavedBin, rememberSavedBin } from './bins.js';
 import { refreshBinCount } from './bin-count.js';
+
+export function clearJson() {
+  if ((ui.editor.value || hasUnsavedEditorContent()) && !confirm('Clear the JSON editor? This cannot be undone.')) return;
+  clearEditor();
+  ui.editor.focus();
+  message('Editor cleared');
+}
 
 export function validateJson() {
   parsed();
@@ -108,26 +115,27 @@ export async function sendTestRequest() {
 
 export async function saveBin() {
   const visibility = document.querySelector('input[name="visibility"]:checked').value;
+  const savedBinId = state.currentSavedBinId;
   const parsedValue = parsed();
   ui.editor.value = JSON.stringify(parsedValue, null, 2);
   storeEditorDraft();
-  if (visibility === 'private' && !ui.key.value.trim()) {
+  if (visibility === 'private' && !savedBinId && !ui.key.value.trim()) {
     const account = await request('/api/accounts', { method: 'POST' });
     showGeneratedKey(account.secretKey);
     $('key-copy-state').textContent = 'A key was generated. Copy and save it now; the bin will not be created until you press Save again.';
   }
-  if (visibility === 'private' && state.copiedKeyValue !== ui.key.value.trim()) {
-    throw keyFieldError('Private bin not saved. Copy the owner key with the Copy button, then press Save bin again.');
-  }
   if (visibility === 'private' && !ui.key.value.trim()) {
     throw keyFieldError('Private bins require the owner key. Enter or generate one in Authentication.');
   }
-  const savedBinId = state.currentSavedBinId;
+  if (visibility === 'private' && !savedBinId && state.copiedKeyValue !== ui.key.value.trim()) {
+    throw keyFieldError('Private bin not saved. Copy the owner key with the Copy button, then press Save bin again.');
+  }
   const method = savedBinId ? 'PUT' : 'POST';
   const target = savedBinId
     ? `/api/bins/${savedBinId}?visibility=${visibility}`
     : `/api/bins?visibility=${visibility}`;
   const value = await sendApiRequest(method, target, JSON.stringify(parsedValue));
+  if (!$('key-error').hidden) keyNotice('');
   if (method === 'POST') refreshBinCount();
   storeEditorDraft(true);
   const id = method === 'POST' ? value.id : savedBinId;

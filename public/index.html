@@ -32,6 +32,7 @@
     </nav>
     <div class="toolbar">
       <label>Upload JSON <input id="upload" type="file" accept=".json,application/json"></label>
+      <button id="clear-json" type="button">Clear editor</button>
       <button id="validate">Validate JSON</button>
       <button id="format">Format / prettify</button>
       <button id="compact" class="icon-button" type="button" aria-label="Compact JSON" title="Compact JSON">
@@ -55,7 +56,7 @@
     </div>
     <section id="table-editor-view" class="table-editor-view" aria-label="Editable JSON table" hidden>
       <div class="table-editor-controls">
-        <p>Open objects and arrays to edit one level at a time. Properties and items can be added or removed.</p>
+        <p>Open objects and arrays to edit one level at a time. Drag or use Up and Down to reorder properties and items.</p>
         <button id="table-editor-add" type="button">Add property</button>
       </div>
       <nav id="table-editor-breadcrumb" class="table-editor-breadcrumbs" aria-label="JSON path"></nav>
@@ -83,6 +84,7 @@
           <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h12l4 4v14H3V3h2Zm2 0v6h10V3M7 21v-8h10v8"/></svg>
           Save bin
         </button>
+        <button id="reload-bin" type="button">Reload bin</button>
         <button id="new-bin" type="button">New bin</button>
       </div>
       <p id="storage-status" class="area-status" role="status" aria-live="polite"></p>
@@ -187,7 +189,7 @@
       <h2>How to use</h2>
       <ol>
         <li>Paste or upload JSON. Save bin validates it and formats it before sending.</li>
-        <li>Choose Public or Private in Save and Manage Bins, then save. Changing visibility updates the selected bin. If Private has no key, Save generates one and pauses; copy it with the Copy button, then press Save bin again to create or update the bin.</li>
+        <li>Choose Public or Private in Save and Manage Bins, then save. Changing visibility updates the selected bin. When creating a Private bin without a key, Save generates one and pauses; copy it with the Copy button, then press Save again. Updating an existing Private bin requires its owner key but does not require copying it again.</li>
         <li>Your bin is saved on the server. To load one by ID, enter the ID under Load a bin by ID; for a private bin, also enter its owner key in Authentication. The saved-bin list on this browser keeps only IDs and visibility, and refreshes when the page opens or returns to focus. Use loads a bin into the editor; Delete removes it from the server and this browser's list.</li>
         <li>The secret key is never stored in the browser. Public reads need only the ID; keyless public bins are managed by this browser's HttpOnly cookie. Private bins require the owner key.</li>
         <li>Bins expire after 30 days without a successful GET, PUT, or PATCH. Any of those operations resets the inactivity timer.</li>

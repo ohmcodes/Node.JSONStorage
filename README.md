@@ -18,7 +18,11 @@ The editor's Repair JSON action can fix common errors such as trailing or missin
 
 To load an existing bin, open **Save and Manage Bins**, enter its ID under **Load a bin by ID**, and select **Load bin**. Private bins also require the owner key in **Authentication**. A successfully loaded bin becomes the current bin and is added to the browser's saved list when storage is available. Public bins can be read with only their ID, but updating or deleting them still requires the owner key or, for keyless bins, the creating browser's owner cookie.
 
+Use **Reload bin** in **Save and Manage Bins** to fetch the current bin's latest server content, including external API changes. Unsaved editor changes require confirmation before they are replaced, and private bins still require the owner key. Use **Clear editor** to empty the editor after confirmation; this does not delete or deselect the current bin.
+
 ### JSON editor and themes
+
+In Table mode, drag a row's Drag control or use Up and Down to reorder properties or array items. JavaScript always orders integer-index object keys numerically before other keys. Saving an existing private bin still requires its owner key, but does not require copying the key again.
 
 Dark theme (default):
 

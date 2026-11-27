@@ -28,6 +28,7 @@ test('load by ID checks visibility, authenticates private bins and preserves edi
   const publicId = 'a'.repeat(32);
   const privateId = 'b'.repeat(32);
   const missingId = 'c'.repeat(32);
+  let serverValue = null;
   const calls = [];
   global.fetch = async (url, options = {}) => {
     calls.push({ url, options });
@@ -40,12 +41,13 @@ test('load by ID checks visibility, authenticates private bins and preserves edi
     if (isPrivate && options.headers['X-Secret-Key'] !== 'owner-key') {
       return Response.json({ error: 'Valid secret key required' }, { status: 401 });
     }
-    return Response.json({ visibility: isPrivate ? 'private' : 'public' });
+    return Response.json(serverValue || { visibility: isPrivate ? 'private' : 'public' });
   };
-  const { loadBinById, getSavedBins, rememberSavedBin, reconcileSavedBins } = await import('../public/bins.js');
+  const { loadBinById, reloadCurrentBin, getSavedBins, rememberSavedBin, reconcileSavedBins } = await import('../public/bins.js');
   const { state } = await import('../public/core.js');
   const id = element('load-bin-id');
   const editor = element('editor');
+  await assert.rejects(reloadCurrentBin(), /Load or save a bin/);
   id.value = 'invalid';
   await assert.rejects(loadBinById(), /valid 32-character/);
   assert.equal(calls.length, 0);
@@ -76,12 +78,39 @@ test('load by ID checks visibility, authenticates private bins and preserves edi
   assert.deepEqual(JSON.parse(editor.value), { visibility: 'private' });
   assert.equal(state.currentSavedBinId, privateId);
   assert.equal(getSavedBins()[0].id, privateId);
+  serverValue = { externallyUpdated: true };
+  await reloadCurrentBin();
+  assert.deepEqual(JSON.parse(editor.value), serverValue);
+  assert.equal(calls.at(-1).options.cache, 'no-store');
+  assert.equal(calls.at(-1).options.headers['X-Secret-Key'], 'owner-key');
   editor.value = 'unsaved changes';
   global.confirm = () => false;
+  await reloadCurrentBin();
+  assert.equal(editor.value, 'unsaved changes');
+  element('key').value = '';
+  await assert.rejects(reloadCurrentBin(), /owner key/);
+  assert.equal(editor.value, 'unsaved changes');
+  element('key').value = 'owner-key';
   id.value = publicId;
   await loadBinById();
   assert.equal(editor.value, 'unsaved changes');
   assert.equal(state.currentSavedBinId, privateId);
+  global.confirm = () => true;
+  let resolveGet;
+  global.fetch = (url, options) => options.method === 'HEAD'
+    ? Promise.resolve(new Response(null, { status: 401, headers: { 'X-Bin-Visibility': 'private' } }))
+    : new Promise(resolve => { resolveGet = resolve; });
+  const pendingReload = reloadCurrentBin();
+  await new Promise(resolve => setImmediate(resolve));
+  state.currentSavedBinId = publicId;
+  resolveGet(Response.json({ stale: true }));
+  await assert.rejects(pendingReload, /current bin changed/);
+  assert.equal(editor.value, 'unsaved changes');
+  global.fetch = async () => new Response(null, { status: 404 });
+  state.currentSavedBinId = missingId;
+  await assert.rejects(reloadCurrentBin(), /not found/);
+  assert.equal(editor.value, 'unsaved changes');
+  state.currentSavedBinId = privateId;
   const pendingChecks = [];
   global.fetch = () => new Promise(resolve => pendingChecks.push(resolve));
   const reconciliation = reconcileSavedBins();

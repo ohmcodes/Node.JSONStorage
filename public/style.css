@@ -79,6 +79,9 @@ textarea::placeholder { color: var(--muted); opacity: 1; }
 .table-editor-key { min-width: 10rem; }
 .table-editor-value { display: block; width: 100%; min-width: 20rem; min-height: 4rem; margin: 0; padding: .55rem .7rem; font: 13px/1.5 monospace; resize: vertical; }
 .table-editor-open { text-align: left; }
+.table-editor-drag { cursor: grab; }
+.table-editor-drag:active { cursor: grabbing; }
+.table-editor td:last-child button { margin: 0 .25rem .25rem 0; }
 #status { margin: .5rem 0 1rem; padding: .7rem .85rem; color: var(--text); font-weight: 600; overflow-wrap: anywhere; }
 #status:empty { display: none; }
 #status[data-state="success"] { color: #155d32; border-left: 3px solid #2c8a4b; padding-left: .65rem; }

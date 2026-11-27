@@ -26,6 +26,7 @@ const draftController = createDraftController({
   draftState: $('draft-state')
 });
 
+let tableModeError = '';
 const tableEditor = createTableEditor({
   editor: ui.editor,
   rawView: $('raw-editor-view'),
@@ -37,7 +38,15 @@ const tableEditor = createTableEditor({
   addEntryButton: $('table-editor-add'),
   errorElement: $('table-editor-error'),
   onChange: () => draftController.store(),
-  onError: text => message(text, 'error')
+  onError: text => {
+    if (text) {
+      tableModeError = text;
+      message(text, 'error');
+    } else {
+      if (ui.status.dataset.state === 'error' && ui.status.textContent === tableModeError) message('');
+      tableModeError = '';
+    }
+  }
 });
 
 export function showSavedBinId(binId) {
@@ -51,9 +60,15 @@ export function showSavedBinId(binId) {
   $('storage-panel').open = true;
 }
 
-export function storeEditorDraft(saved = false) {
+export function storeEditorDraft(saved = false, resetTablePath = false) {
   draftController.store(saved);
-  tableEditor.refreshFromEditor();
+  tableEditor.refreshFromEditor(resetTablePath);
+}
+
+export function clearEditor() {
+  tableEditor.reset();
+  ui.editor.value = '';
+  draftController.store();
 }
 
 export function hasUnsavedEditorContent() {

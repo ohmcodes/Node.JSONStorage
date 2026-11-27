@@ -21,6 +21,8 @@ export function createTableEditor({
   let path = [];
   let rootKind = '';
   let invalidEdits = false;
+  let tableModeError = false;
+  let draggedRow = null;
 
   function showMode(nextMode) {
     mode = nextMode;
@@ -33,6 +35,17 @@ export function createTableEditor({
   function setError(text) {
     errorElement.textContent = text;
     errorElement.hidden = !text;
+  }
+
+  function clearTableModeError() {
+    if (!tableModeError) return;
+    tableModeError = false;
+    onError('');
+  }
+
+  function reportTableModeError(error) {
+    tableModeError = true;
+    onError(error.message);
   }
 
   function parseEditor() {
@@ -125,6 +138,22 @@ export function createTableEditor({
 
     if (parentKind === 'object' || parentKind === 'array') {
       const actionCell = document.createElement('td');
+      const handle = document.createElement('button');
+      handle.type = 'button';
+      handle.className = 'table-editor-drag';
+      handle.draggable = true;
+      handle.textContent = 'Drag';
+      handle.setAttribute('aria-label', `Drag ${parentKind === 'array' ? `item ${label}` : `property ${label}`} to reorder`);
+      actionCell.append(handle);
+      for (const [direction, text] of [['up', 'Up'], ['down', 'Down']]) {
+        const moveButton = document.createElement('button');
+        moveButton.type = 'button';
+        moveButton.className = 'table-editor-move';
+        moveButton.dataset.direction = direction;
+        moveButton.textContent = text;
+        moveButton.setAttribute('aria-label', `Move ${parentKind === 'array' ? `item ${label}` : `property ${label}`} ${direction}`);
+        actionCell.append(moveButton);
+      }
       const removeButton = document.createElement('button');
       removeButton.type = 'button';
       removeButton.className = 'table-editor-remove';
@@ -226,14 +255,26 @@ export function createTableEditor({
     }
   }
 
-  function refreshFromEditor() {
-    if (mode !== 'table') return;
+  function refreshFromEditor(resetPath = false) {
+    if (resetPath) path = [];
+    if (mode !== 'table') {
+      if (tableModeError) {
+        try {
+          JSON.parse(editor.value);
+          clearTableModeError();
+        } catch {
+          // Keep the table error until the raw JSON is valid.
+        }
+      }
+      return;
+    }
     try {
       const root = parseEditor();
       valueAtPath(root);
       render(root);
+      clearTableModeError();
     } catch (error) {
-      onError(error.message);
+      reportTableModeError(error);
       showMode('raw');
     }
   }
@@ -244,15 +285,16 @@ export function createTableEditor({
       try {
         path = [];
         render(parseEditor());
+        clearTableModeError();
       } catch (error) {
-        onError(error.message);
+        reportTableModeError(error);
         return;
       }
     } else {
       try {
         syncToEditor();
       } catch (error) {
-        onError(error.message);
+        reportTableModeError(error);
       }
       invalidEdits = false;
       setError('');
@@ -305,7 +347,7 @@ export function createTableEditor({
       syncToEditor();
       const row = button.closest('tr');
       const key = rootKind === 'array'
-        ? Number(row.cells[0].textContent)
+        ? [...tableBody.rows].indexOf(row)
         : row.querySelector('.table-editor-key').value;
       path = [...path, key];
       render(parseEditor());
@@ -319,6 +361,28 @@ export function createTableEditor({
       syncToEditor();
       path = path.slice(0, Number(button.dataset.pathDepth));
       render(parseEditor());
+    } catch (error) {
+      setError(error.message);
+    }
+  }
+
+  function moveEntry(row, targetIndex, focusDirection = '') {
+    const sourceIndex = [...tableBody.rows].indexOf(row);
+    if (sourceIndex < 0 || targetIndex < 0 || targetIndex >= tableBody.rows.length || sourceIndex === targetIndex) return;
+    try {
+      syncToEditor();
+      const root = parseEditor();
+      const value = valueAtPath(root);
+      const entries = rootKind === 'array' ? [...value] : Object.entries(value);
+      entries.splice(targetIndex, 0, entries.splice(sourceIndex, 1)[0]);
+      const reordered = rootKind === 'array' ? entries : Object.fromEntries(entries);
+      if (rootKind === 'object' && Object.keys(reordered).some((key, index) => key !== entries[index][0])) {
+        throw new Error('Integer-index property names are always sorted before other properties in JSON objects.');
+      }
+      editor.value = JSON.stringify(setAtPath(root, path, reordered), null, 2);
+      render(parseEditor());
+      onChange();
+      if (focusDirection) tableBody.rows[targetIndex].querySelector(`[data-direction="${focusDirection}"]`).focus();
     } catch (error) {
       setError(error.message);
     }
@@ -341,8 +405,35 @@ export function createTableEditor({
     const openButton = event.target.closest('.table-editor-open');
     if (openButton) return openEntry(openButton);
     const removeButton = event.target.closest('.table-editor-remove');
-    if (removeButton) removeEntry(removeButton);
+    if (removeButton) return removeEntry(removeButton);
+    const moveButton = event.target.closest('.table-editor-move');
+    if (moveButton) {
+      const row = moveButton.closest('tr');
+      const index = [...tableBody.rows].indexOf(row);
+      moveEntry(row, index + (moveButton.dataset.direction === 'up' ? -1 : 1), moveButton.dataset.direction);
+    }
   });
+  tableBody.addEventListener('dragstart', event => {
+    const handle = event.target.closest('.table-editor-drag');
+    if (!handle) return;
+    draggedRow = handle.closest('tr');
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', 'table-row');
+  });
+  tableBody.addEventListener('dragover', event => {
+    if (!draggedRow || !event.target.closest('tr')) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  });
+  tableBody.addEventListener('drop', event => {
+    if (!draggedRow) return;
+    const target = event.target.closest('tr');
+    if (!target) return;
+    event.preventDefault();
+    moveEntry(draggedRow, [...tableBody.rows].indexOf(target));
+    draggedRow = null;
+  });
+  tableBody.addEventListener('dragend', () => { draggedRow = null; });
   breadcrumb.addEventListener('click', event => {
     const button = event.target.closest('.table-editor-breadcrumb');
     if (button) navigateBreadcrumb(button);
@@ -351,6 +442,13 @@ export function createTableEditor({
   return {
     syncToEditor,
     refreshFromEditor,
+    reset() {
+      path = [];
+      invalidEdits = false;
+      setError('');
+      clearTableModeError();
+      showMode('raw');
+    },
     hasInvalidEdits: () => mode === 'table' && invalidEdits
   };
 }
